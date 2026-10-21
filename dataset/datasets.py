@@ -108,8 +108,9 @@ class StampDataset(Dataset):
         if len(boxes) != len(labels):
             raise ValueError(f"{item['file_name']}: boxes и labels разной длины")
 
+        scale, pad = (1.0, 1.0), (0, 0)
         if self.standard_size is not None:
-            array, boxes = _letterbox(array, boxes, self.standard_size)
+            array, boxes, scale, pad = _letterbox(array, boxes, self.standard_size)
 
         tensor = torch.from_numpy(np.ascontiguousarray(array)).permute(2, 0, 1).float().div_(255)
         target = {
@@ -119,6 +120,8 @@ class StampDataset(Dataset):
             "cipher": item["cipher"],
             "file_name": item["file_name"],
             "orig_size": (item["height"], item["width"]),
+            "scale": scale,
+            "pad": pad,
         }
         return tensor, _format_target(self.model, tensor, target)
 
@@ -162,6 +165,22 @@ def collate_stamps(batch):
     return list(images), list(targets)
 
 
+def boxes_to_original(boxes, target):
+    """Боксы xyxy в пикселях картинки, которую видела модель -> xyxy в пикселях файла.
+
+    Снимает вписывание из standard_size: вычитает белые поля target["pad"],
+    делит на target["scale"] и обрезает по target["orig_size"].
+    Без standard_size scale = (1, 1) и pad = (0, 0): боксы только обрезаются.
+    """
+    scale_h, scale_w = target["scale"]
+    top, left = target["pad"]
+    height, width = target["orig_size"]
+    boxes = torch.as_tensor(boxes, dtype=torch.float32).reshape(-1, 4).clone()
+    boxes[:, [0, 2]] = ((boxes[:, [0, 2]] - left) / scale_w).clamp(0, width)
+    boxes[:, [1, 3]] = ((boxes[:, [1, 3]] - top) / scale_h).clamp(0, height)
+    return boxes
+
+
 def _index_pngs(image_root):
     found = {}
     for path in Path(image_root).rglob("*"):
@@ -202,25 +221,29 @@ def _boxes_xyxy(anns, width, height):
 def _format_target(model, image, target):
     if model == "default":
         return target
+
+    back = {key: target[key] for key in ("orig_size", "scale", "pad")}
     if model == "faster_rcnn":
         return {
             "boxes": target["boxes"],
             "labels": target["labels"],
             "image_id": target["image_id"],
+            **back,
         }
     if model == "rtmdet":
         return {
             "boxes": target["boxes"],
             "labels": target["labels"] - 1,
             "image_id": target["image_id"],
+            **back,
         }
     height, width = image.shape[-2:]
     return {
         "boxes": _xyxy_to_cxcywh(target["boxes"], height, width),
         "labels": target["labels"] - 1,
         "image_id": target["image_id"],
-        "orig_size": target["orig_size"],
         "size": (int(height), int(width)),
+        **back,
     }
 
 
@@ -247,8 +270,9 @@ def _letterbox(image, boxes, size):
     top = (target_h - new_h) // 2
     left = (target_w - new_w) // 2
     canvas[top:top + new_h, left:left + new_w] = resized
+    scale_h, scale_w = new_h / height, new_w / width
     if len(boxes):
         boxes = boxes.copy()
-        boxes[:, [0, 2]] = boxes[:, [0, 2]] * (new_w / width) + left
-        boxes[:, [1, 3]] = boxes[:, [1, 3]] * (new_h / height) + top
-    return canvas, boxes
+        boxes[:, [0, 2]] = boxes[:, [0, 2]] * scale_w + left
+        boxes[:, [1, 3]] = boxes[:, [1, 3]] * scale_h + top
+    return canvas, boxes, (scale_h, scale_w), (top, left)

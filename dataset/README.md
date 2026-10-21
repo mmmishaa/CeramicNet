@@ -77,11 +77,11 @@ def __getitem__(self, idx) -> tuple[torch.Tensor, dict]
 
 1. PNG читается как RGB uint8. Размер сверяется с COCO.
 2. Если задан `transform`, он получает картинку и словарь `{boxes, labels}` и возвращает их же. Боксы всё ещё в пикселях этой картинки. Число `boxes` и `labels` должно совпасть.
-3. Если задан `standard_size`, кадр вписывается в `(H, W)` с сохранением пропорций. Свободное место заливается 255. Боксы получают тот же масштаб и сдвиг.
+3. Если задан `standard_size`, кадр вписывается в `(H, W)` с сохранением пропорций. Свободное место заливается 255. Боксы получают тот же масштаб и сдвиг. Масштаб и ширина полей запоминаются в `scale` и `pad`.
 4. Картинка становится float32 `(3, H, W)` в диапазоне `[0, 1]`.
 5. Словарь приводится к виду, который просит `model`.
 
-До этого шага ключи одни и те же: `boxes`, `labels`, `image_id`, `cipher`, `file_name`, `orig_size`. `orig_size` — `(H, W)` файла, не картинки после `standard_size`.
+До этого шага ключи одни и те же: `boxes`, `labels`, `image_id`, `cipher`, `file_name`, `orig_size`, `scale`, `pad`. `orig_size` — `(H, W)` файла, не картинки после `standard_size`. `scale` — `(по высоте, по ширине)`, во сколько раз кадр уменьшили или увеличили. `pad` — `(сверху, слева)`, ширина белого поля в пикселях. Без `standard_size` `scale = (1.0, 1.0)`, `pad = (0, 0)`.
 
 Высота файлов разная, и боксов на кадре бывает 0, 1 или 2. Стандартный collate DataLoader такие батчи не собирает. `collate_stamps` возвращает список картинок и список словарей.
 
@@ -89,12 +89,12 @@ def __getitem__(self, idx) -> tuple[torch.Tensor, dict]
 
 | `model` | Куда | Боксы | Метка kleimo | Классов у головы | Ключи `target` |
 |---|---|---|---|---|---|
-| `"default"` | YOLO26s | xyxy, пиксели | `1` | перевод делает тренер YOLO | `boxes`, `labels`, `image_id`, `cipher`, `file_name`, `orig_size` |
-| `"faster_rcnn"` | Faster R-CNN ResNet-50 FPN v2 | xyxy, пиксели | `1`, ноль занят фоном | 2 | `boxes`, `labels`, `image_id` |
-| `"rtdetr"` | RT-DETRv2-S | cxcywh, доли кадра от 0 до 1 | `0` | 1 | `boxes`, `labels`, `image_id`, `orig_size`, `size` |
-| `"rtmdet"` | RTMDet-tiny / RTMDet-s | xyxy, пиксели | `0` | 1 | `boxes`, `labels`, `image_id` |
+| `"default"` | YOLO26s | xyxy, пиксели | `1` | перевод делает тренер YOLO | `boxes`, `labels`, `image_id`, `cipher`, `file_name`, `orig_size`, `scale`, `pad` |
+| `"faster_rcnn"` | Faster R-CNN ResNet-50 FPN v2 | xyxy, пиксели | `1`, ноль занят фоном | 2 | `boxes`, `labels`, `image_id`, `orig_size`, `scale`, `pad` |
+| `"rtdetr"` | RT-DETRv2-S | cxcywh, доли кадра от 0 до 1 | `0` | 1 | `boxes`, `labels`, `image_id`, `size`, `orig_size`, `scale`, `pad` |
+| `"rtmdet"` | RTMDet-tiny / RTMDet-s | xyxy, пиксели | `0` | 1 | `boxes`, `labels`, `image_id`, `orig_size`, `scale`, `pad` |
 
-У `"rtdetr"` поле `size` — `(H, W)` картинки, которую видит модель. `orig_size` — размер файла.
+У `"rtdetr"` поле `size` — `(H, W)` картинки, которую видит модель. `orig_size` — размер файла. Доли в `boxes` считаются от `size`, вместе с белыми полями.
 
 ```python
 detr = StampDataset("stamps_coco_merged", standard_size=(640, 640), model="rtdetr")
@@ -108,21 +108,48 @@ image, target = detr[0]
 
 `standard_size` нужен YOLO, RT-DETR и RTMDet, потому что их батч — один тензор. Faster R-CNN принимает кадры разной высоты, ему этот аргумент не обязателен.
 
+## Как вернуть предсказание на исходный снимок
+
+С `standard_size` модель видит кадр с белыми полями, и её боксы записаны в координатах этого кадра, а не файла. Обратный перевод: `x = (x' - pad_left) / scale_w`, `y = (y' - pad_top) / scale_h`. Его делает `boxes_to_original(boxes, target)`: принимает xyxy в пикселях входа модели и возвращает xyxy в пикселях файла, обрезанные по `orig_size`.
+
+Пример. Файл 480×984, `standard_size=(640, 640)`. Кадр уменьшается до 312×640 и встаёт по центру, поля слева и справа по 164. В `target` лежит `scale ≈ (0.6504, 0.65)`, `pad = (0, 164)`. Модель выдала `x1 = 190`, `x2 = 242`. На файле это `(190 - 164) / 0.65 = 40` и `(242 - 164) / 0.65 = 120`.
+
+```python
+from dataset import boxes_to_original
+
+image, target = dataset[i]
+pred = model([image])[0]                          # Faster R-CNN: xyxy в пикселях image
+boxes = boxes_to_original(pred["boxes"], target)  # xyxy в пикселях файла
+```
+
+У `"rtdetr"` модель выдаёт доли `cx, cy, w, h`. Сначала их переводят в xyxy-пиксели картинки `size`, потом вызывают `boxes_to_original`:
+
+```python
+from torchvision.ops import box_convert
+
+h, w = target["size"]
+# pred_boxes — выход модели для этого кадра: доли cx, cy, w, h, форма (N, 4)
+xyxy = box_convert(pred_boxes, "cxcywh", "xyxy") * torch.tensor([w, h, w, h])
+boxes = boxes_to_original(xyxy, target)
+```
+
+Умножать доли сразу на `orig_size` нельзя: поля не учитываются, и бокс съезжает. В примерах Hugging Face так и делают через `post_process_object_detection(..., target_sizes=...)`. Если пользоваться ей, в `target_sizes` передают `target["size"]`, а потом вызывают `boxes_to_original`.
+
 ## Аугментации
 
 Шаг — функция или класс с `__call__(image, target) -> (image, target)`.
 Геометрия картинки и боксов меняется вместе. `labels` при флипе те же.
 Цветовой шаг боксы не трогает и возвращает `target` как есть.
 
-Готовые шаги лежат в `datasets.transforms`: `HorizontalFlip(p=0.5)`, `VerticalFlip(p=0.5)`, `Compose([...])`. Свой шаг добавляется в `Compose` рядом с ними. Формула горизонтального отражения: `x1' = width - x2`, `x2' = width - x1`. Вертикального: `y1' = height - y2`, `y2' = height - y1`. `width` и `height` берутся у картинки, которую шаг получил.
+Готовые шаги лежат в `dataset.transforms`: `HorizontalFlip(p=0.5)`, `VerticalFlip(p=0.5)`, `Compose([...])`. Свой шаг добавляется в `Compose` рядом с ними. Формула горизонтального отражения: `x1' = width - x2`, `x2' = width - x1`. Вертикального: `y1' = height - y2`, `y2' = height - y1`. `width` и `height` берутся у картинки, которую шаг получил.
 
 ## Пример
 
 ```python
 from torch.utils.data import DataLoader
 
-from datasets import StampDataset, collate_stamps
-from datasets.transforms import Compose, HorizontalFlip, VerticalFlip
+from dataset import StampDataset, collate_stamps
+from dataset.transforms import Compose, HorizontalFlip, VerticalFlip
 
 dataset = StampDataset(
     "stamps_coco_merged",
@@ -143,7 +170,7 @@ image, target = dataset[0]
 print(image.shape, target["boxes"].shape, target["labels"])
 ```
 
-Запускать из корня репозитория, чтобы пакет `datasets` был этим каталогом.
+Запускать из корня репозитория, чтобы импортировался пакет `dataset`.
 
 При `num_workers > 0` воркеры наследуют один и тот же `random` и повторяют одни и те же флипы. В `worker_init_fn` достаточно:
 
@@ -158,4 +185,5 @@ def seed_worker(worker_id):
 - Кадр из `negative_dirs` с тем же именем файла, что уже есть в json, не добавляется. В текущих данных так устроены 39 общих файлов `stamps` и `ornaments`: они остаются одним размеченным кадром.
 - При `model="default"` и `"faster_rcnn"` метка kleimo равна 1. При `"rtdetr"` и `"rtmdet"` она равна 0.
 - `standard_size` не растягивает кадр, а вписывает его и дополняет белым.
+- `scale` и `pad` описывают только вписывание в `standard_size`. Если `transform` когда-нибудь начнёт менять размер кадра (кроп, масштаб), `boxes_to_original` вернёт боксы на кадр после `transform`, а не на файл. Флипы размер не меняют.
 - Нормализации ImageNet здесь нет. Деление на 255 — единственное преобразование цвета. Среднее и std задаёт тренер своей модели.

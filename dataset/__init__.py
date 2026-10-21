@@ -1,4 +1,4 @@
-from .datasets import StampDataset, collate_stamps
+from .datasets import StampDataset, boxes_to_original, collate_stamps
 from .transforms import Compose, HorizontalFlip, VerticalFlip
 
 __all__ = [
@@ -6,5 +6,6 @@ __all__ = [
     "HorizontalFlip",
     "StampDataset",
     "VerticalFlip",
+    "boxes_to_original",
     "collate_stamps",
 ]
