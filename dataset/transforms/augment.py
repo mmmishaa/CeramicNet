@@ -1,6 +1,8 @@
 import random
 
 import numpy as np
+import torch
+import torch.nn.functional as F
 
 
 class HorizontalFlip:
@@ -74,6 +76,22 @@ class HighContrast:
         return _contrast(image, random.uniform(*self.factor)), target
 
 
+class Defocus:
+    def __init__(self, p=0.5, radius=(1.0, 3.0)):
+        if isinstance(radius, (int, float)):
+            radius = (radius, radius)
+        low, high = (float(value) for value in radius)
+        if not 0 <= low <= high:
+            raise ValueError(f"Defocus: нужно 0 <= low <= high, получено {radius}")
+        self.p = p
+        self.radius = (low, high)
+
+    def __call__(self, image, target):
+        if random.random() >= self.p:
+            return image, target
+        return _defocus(image, random.uniform(*self.radius)), target
+
+
 def _contrast(image, factor):
     """pixel' = mean + factor * (pixel - mean), mean — средняя яркость кадра в сером."""
     gray = image[..., 0] * 0.299 + image[..., 1] * 0.587 + image[..., 2] * 0.114
@@ -81,3 +99,31 @@ def _contrast(image, factor):
     mean = float(gray.mean())
     out = (image.astype(np.float32) - mean) * factor + mean
     return np.clip(np.rint(out), 0, 255).astype(np.uint8)
+
+
+def _defocus(image, radius):
+    if radius <= 0:
+        return image
+    kernel = _disk_kernel(radius)
+    size = kernel.shape[0]
+    pad = size // 2
+    channels = image.shape[2]
+    x = torch.from_numpy(np.ascontiguousarray(image, dtype=np.float32)).permute(2, 0, 1).unsqueeze(0)
+    x = F.pad(x, (pad, pad, pad, pad), mode="replicate")
+    weight = torch.from_numpy(kernel)[None, None].repeat(channels, 1, 1, 1)
+    out = F.conv2d(x, weight, groups=channels)
+    return out[0].permute(1, 2, 0).round().clamp(0, 255).to(torch.uint8).numpy()
+
+
+def _disk_kernel(radius, supersample=8):
+    half = int(np.ceil(radius))
+    n = (2 * half + 1) * supersample
+    coords = (np.arange(n) + 0.5) / supersample - (half + 0.5)
+    yy, xx = np.meshgrid(coords, coords, indexing="ij")
+    inside = (xx ** 2 + yy ** 2 <= radius ** 2).astype(np.float32)
+    kernel = inside.reshape(2 * half + 1, supersample, 2 * half + 1, supersample).mean(axis=(1, 3))
+    total = kernel.sum()
+    if total == 0:
+        kernel[half, half] = 1.0
+        return kernel
+    return kernel / total

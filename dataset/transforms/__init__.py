@@ -1,4 +1,4 @@
-from .augment import HighContrast, HorizontalFlip, LowContrast, VerticalFlip
+from .augment import Defocus, HighContrast, HorizontalFlip, LowContrast, VerticalFlip
 from .base import Compose
 
-__all__ = ["Compose", "HighContrast", "HorizontalFlip", "LowContrast", "VerticalFlip"]
+__all__ = ["Compose", "Defocus", "HighContrast", "HorizontalFlip", "LowContrast", "VerticalFlip"]
