@@ -9,5 +9,6 @@ __all__ = [
     "HighContrast",
     "HorizontalFlip",
     "LowContrast",
+    "Rotate90",
     "VerticalFlip",
 ]

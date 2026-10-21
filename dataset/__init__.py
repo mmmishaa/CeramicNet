@@ -7,6 +7,7 @@ from .transforms import (
     HighContrast,
     HorizontalFlip,
     LowContrast,
+    Rotate90,
     VerticalFlip,
 )
 
@@ -18,6 +19,7 @@ __all__ = [
     "HighContrast",
     "HorizontalFlip",
     "LowContrast",
+    "Rotate90",
     "StampDataset",
     "VerticalFlip",
     "boxes_to_original",
