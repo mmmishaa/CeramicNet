@@ -39,7 +39,6 @@ class VerticalFlip:
 
 class LowContrast:
     """Снижает контраст. factor берётся случайно из [low, high], оба от 0 до 1.
-
     factor = 1 — кадр без изменений, factor = 0 — сплошной серый.
     """
 
@@ -58,7 +57,6 @@ class LowContrast:
 
 class HighContrast:
     """Повышает контраст. factor берётся случайно из [low, high], оба не меньше 1.
-
     factor = 1 — кадр без изменений. Чем больше factor, тем больше пикселей
     упирается в 0 или 255.
     """
@@ -74,6 +72,38 @@ class HighContrast:
         if random.random() >= self.p:
             return image, target
         return _contrast(image, random.uniform(*self.factor)), target
+
+
+class Grayscale:
+    """Переводит кадр в чёрно-белое. Три канала остаются, в каждом одна яркость."""
+
+    def __init__(self, p=0.5):
+        self.p = p
+
+    def __call__(self, image, target):
+        if random.random() >= self.p:
+            return image, target
+        gray = np.clip(np.rint(_luma(image)), 0, 255).astype(np.uint8)
+        return np.repeat(gray[..., None], 3, axis=2), target
+
+
+class Brightness:
+    """Меняет яркость. factor берётся случайно из [low, high].
+    factor = 1 — кадр без изменений. Меньше 1 — темнее, больше 1 — светлее.
+    """
+
+    def __init__(self, p=0.5, factor=(0.6, 1.4)):
+        low, high = (float(value) for value in factor)
+        if not 0 <= low <= high:
+            raise ValueError(f"Brightness: нужно 0 <= low <= high, получено {factor}")
+        self.p = p
+        self.factor = (low, high)
+
+    def __call__(self, image, target):
+        if random.random() >= self.p:
+            return image, target
+        out = image.astype(np.float32) * random.uniform(*self.factor)
+        return np.clip(np.rint(out), 0, 255).astype(np.uint8), target
 
 
 class Defocus:
@@ -92,11 +122,14 @@ class Defocus:
         return _defocus(image, random.uniform(*self.radius)), target
 
 
+def _luma(image):
+    """Яркость по ITU-R BT.601: 0.299 R + 0.587 G + 0.114 B."""
+    return image[..., 0] * 0.299 + image[..., 1] * 0.587 + image[..., 2] * 0.114
+
+
 def _contrast(image, factor):
     """pixel' = mean + factor * (pixel - mean), mean — средняя яркость кадра в сером."""
-    gray = image[..., 0] * 0.299 + image[..., 1] * 0.587 + image[..., 2] * 0.114
-    # standart weights to transform coloured picture to gray from ITU-R BT.601 standart
-    mean = float(gray.mean())
+    mean = float(_luma(image).mean())
     out = (image.astype(np.float32) - mean) * factor + mean
     return np.clip(np.rint(out), 0, 255).astype(np.uint8)
 
