@@ -35,7 +35,6 @@ stamps_coco_merged/
 StampDataset(
     root_dir,
     transform=None,
-    ciphers=None,
     standard_size=None,
     model="default",
     negative_dirs=None,
@@ -46,7 +45,6 @@ StampDataset(
 |---|---|
 | `root_dir` | Папка `stamps_coco_merged`. |
 | `transform` | `transform(image, target) -> (image, target)`. `image` — uint8 RGB `(H, W, 3)`. `target["boxes"]` — float32 `(N, 4)` xyxy, `target["labels"]` — int64 `(N,)`. Формат ещё общий: `model` применяется после аугментации. |
-| `ciphers` | Какие шифры оставить. `None` — все. Так устроены train/val/test. |
 | `standard_size` | `(H, W)`. Кадр вписывается в этот прямоугольник, поля белые, боксы сдвигаются вместе с пикселями. `None` — размер файла. |
 | `model` | `"default"`, `"faster_rcnn"`, `"rtdetr"` или `"rtmdet"`. Другое значение — `ValueError`. |
 | `negative_dirs` | Папки PNG, на которых клейма нет. `None` — только json. Кадр получает пустые `boxes` и `labels`. |
@@ -57,11 +55,10 @@ StampDataset(
 2. PNG из `images/default/` складываются в словарь по NFC-имени.
 3. К каждому кадру приклеиваются его боксы. COCO `xywh` становится `xyxy` и обрезается по границе кадра.
 4. Если у кадра в json нет аннотаций, он всё равно попадает в индекс с пустыми `boxes` и `labels`.
-5. Если задан `ciphers`, остаются только эти шифры.
-6. Из каждой папки `negative_dirs` читаются PNG. Имя уже есть среди кадров json — файл пропускается, второй раз он не добавляется. У остальных боксов нет. Шифр берётся из имени так же, как у размеченных.
-7. Словарь кадра попадает в `self.items`. Пиксели на этом шаге не читаются. Для кадра без json читается только размер файла.
+5. Из каждой папки `negative_dirs` читаются PNG. Имя уже есть среди кадров json — файл пропускается, второй раз он не добавляется. У остальных боксов нет. Шифр берётся из имени так же, как у размеченных.
+6. Словарь кадра попадает в `self.items`. Пиксели на этом шаге не читаются. Для кадра без json читается только размер файла.
 
-Поля элемента `self.items`: `path`, `file_name`, `image_id`, `width`, `height`, `cipher`, `shot`, `boxes`, `labels`. `boxes` здесь всегда xyxy исходного файла, без `transform` и без `standard_size`. Если клейма нет, `boxes` имеет форму `(0, 4)`, а `labels` — форму `(0,)`. У размеченного kleimo `labels` равен `1`. Незнакомый шифр, из-за которого не осталось ни одного кадра, даёт `ValueError`.
+Поля элемента `self.items`: `path`, `file_name`, `image_id`, `width`, `height`, `cipher`, `shot`, `boxes`, `labels`. `boxes` здесь всегда xyxy исходного файла, без `transform` и без `standard_size`. Если клейма нет, `boxes` имеет форму `(0, 4)`, а `labels` — форму `(0,)`. У размеченного kleimo `labels` равен `1`.
 
 ## `__len__`
 
@@ -89,8 +86,6 @@ def __getitem__(self, idx) -> tuple[torch.Tensor, dict]
 Высота файлов разная, и боксов на кадре бывает 0, 1 или 2. Стандартный collate DataLoader такие батчи не собирает. `collate_stamps` возвращает список картинок и список словарей.
 
 ## Параметр `model`
-
-`split_by_cipher` копирует `model` в каждую часть.
 
 | `model` | Куда | Боксы | Метка kleimo | Классов у головы | Ключи `target` |
 |---|---|---|---|---|---|
@@ -121,44 +116,30 @@ image, target = detr[0]
 
 Готовые шаги лежат в `datasets.transforms`: `HorizontalFlip(p=0.5)`, `VerticalFlip(p=0.5)`, `Compose([...])`. Свой шаг добавляется в `Compose` рядом с ними. Формула горизонтального отражения: `x1' = width - x2`, `x2' = width - x1`. Вертикального: `y1' = height - y2`, `y2' = height - y1`. `width` и `height` берутся у картинки, которую шаг получил.
 
-## Train / val / test
-
-Резать нужно по шифру. Иначе два кадра одного донца разъедутся по train и test. Это касается и тех двух предметов, у которых в `stamps` по два ракурса.
-
-```python
-parts = split_by_cipher(dataset, val_ratio=0.1, test_ratio=0.1, seed=0)
-parts["train"].transform = Compose([HorizontalFlip(0.5), VerticalFlip(0.5)])
-```
-
-`split_by_cipher` перемешивает шифры, не файлы, и сохраняет `model`, `standard_size`, `transform` и `negative_dirs`. Кадр без клейма уходит в ту же часть, что и остальные снимки его шифра. Внутри части порядок кадров остаётся порядком индекса. Доли округляются вниз, остаток остаётся в train. `test_ratio=0` даёт пустой test.
-
-Обе доли должны быть неотрицательными, их сумма меньше 1. Иначе `ValueError`.
-
 ## Пример
 
 ```python
 from torch.utils.data import DataLoader
 
-from datasets import StampDataset, collate_stamps, split_by_cipher
+from datasets import StampDataset, collate_stamps
 from datasets.transforms import Compose, HorizontalFlip, VerticalFlip
 
-source = StampDataset(
+dataset = StampDataset(
     "stamps_coco_merged",
+    transform=Compose([HorizontalFlip(0.5), VerticalFlip(0.5)]),
     standard_size=(640, 640),
     model="default",
     negative_dirs=["Клеймы /ornaments", "Клеймы /empty"],
 )
-parts = split_by_cipher(source, val_ratio=0.1, test_ratio=0.1, seed=0)
-parts["train"].transform = Compose([HorizontalFlip(0.5), VerticalFlip(0.5)])
 
 loader = DataLoader(
-    parts["train"],
+    dataset,
     batch_size=8,
     shuffle=True,
     collate_fn=collate_stamps,
 )
 
-image, target = parts["train"][0]
+image, target = dataset[0]
 print(image.shape, target["boxes"].shape, target["labels"])
 ```
 

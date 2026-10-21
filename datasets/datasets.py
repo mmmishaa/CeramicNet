@@ -1,5 +1,4 @@
 import json
-import random
 import unicodedata
 from collections import defaultdict
 from pathlib import Path
@@ -29,7 +28,6 @@ class StampDataset(Dataset):
         self,
         root_dir,
         transform=None,
-        ciphers=None,
         standard_size=None,
         model="default",
         negative_dirs=None,
@@ -58,16 +56,11 @@ class StampDataset(Dataset):
         for ann in raw["annotations"]:
             grouped[int(ann["image_id"])].append(ann)
 
-        want = None
-        if ciphers is not None:
-            want = {unicodedata.normalize("NFC", cipher) for cipher in ciphers}
         self.items = []
         missing = []
         for image in sorted(raw["images"], key=lambda item: int(item["id"])):
             file_name = unicodedata.normalize("NFC", str(image["file_name"]).replace("\\", "/"))
             cipher, shot = _cipher_and_shot(file_name)
-            if want is not None and cipher not in want:
-                continue
             path = paths.get(file_name)
             if path is None:
                 missing.append(file_name)
@@ -91,10 +84,7 @@ class StampDataset(Dataset):
 
         if missing:
             raise FileNotFoundError(f"в {image_root} нет кадров из COCO, например {missing[0]}")
-        self._add_negatives(want)
-        if want and not self.items:
-            sample = next(iter(want))
-            raise ValueError(f"в датасете нет шифра {sample!r}")
+        self._add_negatives()
 
     def __len__(self):
         return len(self.items)
@@ -132,7 +122,7 @@ class StampDataset(Dataset):
         }
         return tensor, _format_target(self.model, tensor, target)
 
-    def _add_negatives(self, want):
+    def _add_negatives(self):
         known = {Path(item["file_name"]).name for item in self.items}
         next_id = max((item["image_id"] for item in self.items), default=0) + 1
         paths = []
@@ -149,8 +139,6 @@ class StampDataset(Dataset):
             if name in known:
                 continue
             cipher, shot = _cipher_and_shot(name)
-            if want is not None and cipher not in want:
-                continue
             known.add(name)
             with Image.open(path) as image:
                 width, height = image.size
@@ -166,32 +154,6 @@ class StampDataset(Dataset):
                 "labels": np.zeros((0,), dtype=np.int64),
             })
             next_id += 1
-
-
-def split_by_cipher(dataset, val_ratio=0.1, test_ratio=0.1, seed=0):
-    """Делит по шифру предмета. Кадры одного шифра остаются в одной части."""
-    if val_ratio < 0 or test_ratio < 0 or val_ratio + test_ratio >= 1:
-        raise ValueError("val_ratio и test_ratio должны быть >= 0, а их сумма < 1")
-    order = sorted({item["cipher"] for item in dataset.items})
-    random.Random(seed).shuffle(order)
-    n_val = int(len(order) * val_ratio)
-    n_test = int(len(order) * test_ratio)
-    groups = {
-        "val": order[:n_val],
-        "test": order[n_val:n_val + n_test],
-        "train": order[n_val + n_test:],
-    }
-    return {
-        name: StampDataset(
-            dataset.root_dir,
-            transform=dataset.transform,
-            ciphers=ciphers,
-            standard_size=dataset.standard_size,
-            model=dataset.model,
-            negative_dirs=dataset.negative_dirs,
-        )
-        for name, ciphers in groups.items()
-    }
 
 
 def collate_stamps(batch):
