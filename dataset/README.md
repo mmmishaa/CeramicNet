@@ -138,10 +138,18 @@ boxes = boxes_to_original(xyxy, target)
 ## Аугментации
 
 Шаг — функция или класс с `__call__(image, target) -> (image, target)`.
-Геометрия картинки и боксов меняется вместе. `labels` при флипе те же.
+Геометрия картинки и боксов меняется вместе. `labels` при флипе и повороте те же.
 Цветовой шаг боксы не трогает и возвращает `target` как есть.
 
-Готовые шаги лежат в `dataset.transforms`: `HorizontalFlip(p=0.5)`, `VerticalFlip(p=0.5)`, `LowContrast(p=0.5, factor=(0.5, 0.8))`, `HighContrast(p=0.5, factor=(1.2, 1.5))`, `Defocus(p=0.5, radius=(1.0, 3.0))`, `Compose([...])`. Свой шаг добавляется в `Compose` рядом с ними. Формула горизонтального отражения: `x1' = width - x2`, `x2' = width - x1`. Вертикального: `y1' = height - y2`, `y2' = height - y1`. `width` и `height` берутся у картинки, которую шаг получил.
+Готовые шаги лежат в `dataset.transforms`: `HorizontalFlip(p=0.5)`, `VerticalFlip(p=0.5)`, `Rotate90(p=0.5, angles=(90, 180, 270))`, `LowContrast(p=0.5, factor=(0.5, 0.8))`, `HighContrast(p=0.5, factor=(1.2, 1.5))`, `Defocus(p=0.5, radius=(1.0, 3.0))`, `Compose([...])`. Свой шаг добавляется в `Compose` рядом с ними. Формула горизонтального отражения: `x1' = width - x2`, `x2' = width - x1`. Вертикального: `y1' = height - y2`, `y2' = height - y1`. `width` и `height` берутся у картинки, которую шаг получил.
+
+`Rotate90` поворачивает кадр против часовой стрелки на угол, выбранный случайно из `angles`. При 90 и 270 ширина и высота кадра меняются местами. Формулы для боксов, где `width` и `height` — размеры кадра до поворота:
+
+| Угол | `x1'` | `y1'` | `x2'` | `y2'` |
+|---|---|---|---|---|
+| 90 | `y1` | `width - x2` | `y2` | `width - x1` |
+| 180 | `width - x2` | `height - y2` | `width - x1` | `height - y1` |
+| 270 | `height - y2` | `x1` | `height - y1` | `x2` |
 
 `LowContrast` и `HighContrast` — цветовые шаги, боксы они не трогают. Формула: `pixel' = mean + factor * (pixel - mean)`, где `mean` — средняя яркость кадра в оттенках серого, результат обрезается до `0..255`. `factor` выбирается случайно из диапазона при каждом вызове: у `LowContrast` он от 0 до 1, у `HighContrast` не меньше 1. При `factor = 1` кадр не меняется.
 
@@ -151,6 +159,7 @@ boxes = boxes_to_original(xyxy, target)
 transform = Compose([
     HorizontalFlip(0.5),
     VerticalFlip(0.5),
+    Rotate90(0.5),
     LowContrast(0.3),
     HighContrast(0.3),
     Defocus(0.3),               # радиус 1–3
@@ -200,5 +209,5 @@ def seed_worker(worker_id):
 - Кадр из `negative_dirs` с тем же именем файла, что уже есть в json, не добавляется. В текущих данных так устроены 39 общих файлов `stamps` и `ornaments`: они остаются одним размеченным кадром.
 - При `model="default"` и `"faster_rcnn"` метка kleimo равна 1. При `"rtdetr"` и `"rtmdet"` она равна 0.
 - `standard_size` не растягивает кадр, а вписывает его и дополняет белым.
-- `scale` и `pad` описывают только вписывание в `standard_size`. Если `transform` когда-нибудь начнёт менять размер кадра (кроп, масштаб), `boxes_to_original` вернёт боксы на кадр после `transform`, а не на файл. Флипы размер не меняют.
+- `scale` и `pad` описывают только вписывание в `standard_size`. Если `transform` меняет кадр (`Rotate90`, флипы, в будущем кроп или масштаб), `boxes_to_original` вернёт боксы на кадр после `transform`, а не на файл. Аугментации нужны только на train, на валидации и предсказании `transform` не ставят.
 - Нормализации ImageNet здесь нет. Деление на 255 — единственное преобразование цвета. Среднее и std задаёт тренер своей модели.

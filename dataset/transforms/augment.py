@@ -37,6 +37,41 @@ class VerticalFlip:
         return image, {**target, "boxes": boxes}
 
 
+class Rotate90:
+    # Поворот против часовой стрелки на угол из angles. При 90 и 270 ширина и высота меняются местами.
+    def __init__(self, p=0.5, angles=(90, 180, 270)):
+        angles = tuple(int(angle) for angle in angles)
+        if not angles or any(angle not in (90, 180, 270) for angle in angles):
+            raise ValueError(f"Rotate90: углы только из 90, 180, 270, получено {angles}")
+        self.p = p
+        self.angles = angles
+
+    def __call__(self, image, target):
+        if random.random() >= self.p:
+            return image, target
+        angle = random.choice(self.angles)
+        height, width = image.shape[:2]
+        image = np.ascontiguousarray(np.rot90(image, k=angle // 90))
+        boxes = np.array(target["boxes"], dtype=np.float32, copy=True)
+        x1, y1, x2, y2 = (boxes[:, i].copy() for i in range(4))
+        if angle == 90:
+            boxes[:, 0] = y1
+            boxes[:, 1] = width - x2
+            boxes[:, 2] = y2
+            boxes[:, 3] = width - x1
+        elif angle == 180:
+            boxes[:, 0] = width - x2
+            boxes[:, 1] = height - y2
+            boxes[:, 2] = width - x1
+            boxes[:, 3] = height - y1
+        else:
+            boxes[:, 0] = height - y2
+            boxes[:, 1] = x1
+            boxes[:, 2] = height - y1
+            boxes[:, 3] = x2
+        return image, {**target, "boxes": boxes}
+
+
 class LowContrast:
     """Снижает контраст. factor берётся случайно из [low, high], оба от 0 до 1.
 
