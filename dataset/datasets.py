@@ -10,6 +10,7 @@ from torch.utils.data import Dataset
 
 _RESAMPLE = getattr(Image, "Resampling", Image).BILINEAR
 _MODELS = ("default", "faster_rcnn", "rtdetr", "rtmdet")
+_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".bmp", ".webp", ".tif", ".tiff"}
 
 
 class StampDataset(Dataset):
@@ -22,6 +23,10 @@ class StampDataset(Dataset):
     model выбирает запись боксов на выходе: default, faster_rcnn, rtdetr, rtmdet.
     negative_dirs — папки кадров без клейма. У такого кадра боксов нет.
     В COCO боксов тоже может не быть: кадр остаётся, boxes пустой.
+    ann_file и image_root позволяют читать общий train.json/val.json без
+    копирования изображений. При None используется прежняя структура root_dir.
+    model="default" сохраняет COCO ID; у Faster R-CNN метки начинаются с 1,
+    у RT-DETR/RTMDet — с 0, независимо от исходных ID категорий.
     """
 
     def __init__(
@@ -31,6 +36,8 @@ class StampDataset(Dataset):
         standard_size=None,
         model="default",
         negative_dirs=None,
+        ann_file=None,
+        image_root=None,
     ):
         self.root_dir = Path(root_dir)
         self.transform = transform
@@ -46,11 +53,20 @@ class StampDataset(Dataset):
             if self.standard_size[0] < 1 or self.standard_size[1] < 1:
                 raise ValueError(f"standard_size должен быть (H, W) из положительных чисел, получено {standard_size}")
 
-        ann_path = self.root_dir / "annotations" / "instances_default.json"
-        image_root = self.root_dir / "images" / "default"
+        ann_path = Path(ann_file) if ann_file is not None else self.root_dir / "annotations" / "instances_default.json"
+        image_root = Path(image_root) if image_root is not None else self.root_dir / "images" / "default"
+        self.ann_file, self.image_root = ann_path, image_root
         raw = json.loads(ann_path.read_text(encoding="utf-8"))
-        self.categories = {int(cat["id"]): str(cat["name"]) for cat in raw["categories"]}
-        paths = _index_pngs(image_root)
+        self.categories = {int(cat["id"]): str(cat["name"])
+                           for cat in sorted(raw["categories"], key=lambda c: int(c["id"]))}
+        category_ids = list(self.categories)
+        if self.model == "default":
+            self.category_to_label = {category_id: category_id for category_id in category_ids}
+        else:
+            offset = 1 if self.model == "faster_rcnn" else 0
+            self.category_to_label = {category_id: i + offset for i, category_id in enumerate(category_ids)}
+        self.label_to_category = {label: category_id for category_id, label in self.category_to_label.items()}
+        paths = _index_images(image_root)
 
         grouped = defaultdict(list)
         for ann in raw["annotations"]:
@@ -70,6 +86,7 @@ class StampDataset(Dataset):
                 int(image["width"]),
                 int(image["height"]),
             )
+            labels = np.asarray([self.category_to_label[int(label)] for label in labels], dtype=np.int64)
             self.items.append({
                 "path": path,
                 "file_name": file_name,
@@ -89,7 +106,12 @@ class StampDataset(Dataset):
     def __len__(self):
         return len(self.items)
 
-    def __getitem__(self, idx):
+    def load_raw(self, idx):
+        """Shared RGB uint8 HWC + numpy XYXY target, before model-specific formatting.
+
+        Training augmentations and optional letterbox are applied once here.
+        Native integrations use this method to avoid tensor/PIL round trips.
+        """
         item = self.items[idx]
         with Image.open(item["path"]) as image:
             array = np.array(image.convert("RGB"), copy=True)
@@ -112,10 +134,9 @@ class StampDataset(Dataset):
         if self.standard_size is not None:
             array, boxes, scale, pad = _letterbox(array, boxes, self.standard_size)
 
-        tensor = torch.from_numpy(np.ascontiguousarray(array)).permute(2, 0, 1).float().div_(255)
         target = {
-            "boxes": torch.from_numpy(np.ascontiguousarray(boxes)).float(),
-            "labels": torch.from_numpy(np.ascontiguousarray(labels)).long(),
+            "boxes": boxes,
+            "labels": labels,
             "image_id": item["image_id"],
             "cipher": item["cipher"],
             "file_name": item["file_name"],
@@ -123,6 +144,14 @@ class StampDataset(Dataset):
             "scale": scale,
             "pad": pad,
         }
+        return array, target
+
+    def __getitem__(self, idx):
+        array, target = self.load_raw(idx)
+        tensor = torch.from_numpy(np.ascontiguousarray(array)).permute(2, 0, 1).float().div_(255)
+        target = {**target,
+                  "boxes": torch.from_numpy(np.ascontiguousarray(target["boxes"])).float(),
+                  "labels": torch.from_numpy(np.ascontiguousarray(target["labels"])).long()}
         return tensor, _format_target(self.model, tensor, target)
 
     def _add_negatives(self):
@@ -134,7 +163,7 @@ class StampDataset(Dataset):
                 raise FileNotFoundError(f"нет папки без клейм: {folder}")
             paths.extend(
                 path for path in folder.rglob("*")
-                if path.is_file() and path.suffix.lower() == ".png"
+                if path.is_file() and path.suffix.lower() in _IMAGE_SUFFIXES
             )
         paths.sort(key=lambda path: unicodedata.normalize("NFC", str(path)))
         for path in paths:
@@ -181,10 +210,10 @@ def boxes_to_original(boxes, target):
     return boxes
 
 
-def _index_pngs(image_root):
+def _index_images(image_root):
     found = {}
     for path in Path(image_root).rglob("*"):
-        if not path.is_file() or path.suffix.lower() != ".png":
+        if not path.is_file() or path.suffix.lower() not in _IMAGE_SUFFIXES:
             continue
         key = unicodedata.normalize("NFC", path.relative_to(image_root).as_posix())
         if key in found:
@@ -233,14 +262,14 @@ def _format_target(model, image, target):
     if model == "rtmdet":
         return {
             "boxes": target["boxes"],
-            "labels": target["labels"] - 1,
+            "labels": target["labels"],
             "image_id": target["image_id"],
             **back,
         }
     height, width = image.shape[-2:]
     return {
         "boxes": _xyxy_to_cxcywh(target["boxes"], height, width),
-        "labels": target["labels"] - 1,
+        "labels": target["labels"],
         "image_id": target["image_id"],
         "size": (int(height), int(width)),
         **back,

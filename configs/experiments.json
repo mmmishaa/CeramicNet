@@ -1,0 +1,11 @@
+{
+  "seed": 42,
+  "epochs": 50,
+  "batch_size": 8,
+  "models": {
+    "fasterrcnn_resnet50_fpn_v2": {"augmentation": "light"},
+    "rtdetrv2_s": {"augmentation": "light"},
+    "rtmdet_tiny": {"augmentation": "light"},
+    "rtmdet_s": {"augmentation": "light"}
+  }
+}

@@ -1,0 +1,7 @@
+# Use a Python >=3.10 environment. Install an officially compatible torch/torchvision pair
+# for your CUDA version first; keep RT-DETR and MMDetection in separate environments.
+torch>=2.2
+torchvision>=0.17
+numpy>=1.24
+Pillow>=10
+pycocotools>=2.0.7
