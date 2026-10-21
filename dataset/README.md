@@ -141,7 +141,18 @@ boxes = boxes_to_original(xyxy, target)
 Геометрия картинки и боксов меняется вместе. `labels` при флипе те же.
 Цветовой шаг боксы не трогает и возвращает `target` как есть.
 
-Готовые шаги лежат в `dataset.transforms`: `HorizontalFlip(p=0.5)`, `VerticalFlip(p=0.5)`, `Compose([...])`. Свой шаг добавляется в `Compose` рядом с ними. Формула горизонтального отражения: `x1' = width - x2`, `x2' = width - x1`. Вертикального: `y1' = height - y2`, `y2' = height - y1`. `width` и `height` берутся у картинки, которую шаг получил.
+Готовые шаги лежат в `dataset.transforms`: `HorizontalFlip(p=0.5)`, `VerticalFlip(p=0.5)`, `LowContrast(p=0.5, factor=(0.5, 0.8))`, `HighContrast(p=0.5, factor=(1.2, 1.5))`, `Compose([...])`. Свой шаг добавляется в `Compose` рядом с ними. Формула горизонтального отражения: `x1' = width - x2`, `x2' = width - x1`. Вертикального: `y1' = height - y2`, `y2' = height - y1`. `width` и `height` берутся у картинки, которую шаг получил.
+
+`LowContrast` и `HighContrast` — цветовые шаги, боксы они не трогают. Формула: `pixel' = mean + factor * (pixel - mean)`, где `mean` — средняя яркость кадра в оттенках серого, результат обрезается до `0..255`. `factor` выбирается случайно из диапазона при каждом вызове: у `LowContrast` он от 0 до 1, у `HighContrast` не меньше 1. При `factor = 1` кадр не меняется.
+
+```python
+transform = Compose([
+    HorizontalFlip(0.5),
+    VerticalFlip(0.5),
+    LowContrast(0.3),
+    HighContrast(0.3),
+])
+```
 
 ## Пример
 
