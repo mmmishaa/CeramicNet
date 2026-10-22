@@ -1,4 +1,13 @@
-from .augment import Brightness, Defocus, Grayscale, HighContrast, HorizontalFlip, LowContrast, VerticalFlip
+from .augment import (
+    Brightness,
+    Defocus,
+    Grayscale,
+    HighContrast,
+    HorizontalFlip,
+    LowContrast,
+    Rotate90,
+    VerticalFlip,
+)
 from .base import Compose
 
 __all__ = [

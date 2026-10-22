@@ -59,14 +59,16 @@ dataset = StampDataset(
 
 Датасет сам выборку не делит. Индексы уже созданного `dataset` перемешиваются, часть уходит в test, остальные остаются в train. Аугментации нужны только train, поэтому это два объекта `StampDataset` с одним `root_dir` и одними индексами: `transform` задан только у train. `Subset` хранит индексы.
 
-`collate_stamps` собирает батч списком картинок и списком словарей: число боксов на кадре разное, в один тензор их не склеить.
+Форматтер сидит в `__getitem__` и готовит один кадр. Для `rtdetr` боксы становятся `cx, cy, w, h` от 0 до 1, метка клейма сдвигается с 1 на 0. Для `faster_rcnn` боксы остаются в пикселях, метка остаётся 1.
+
+Коллатор собирает уже готовые кадры в батч. Его передают в `DataLoader`: `collate_fn=get_collate_fn("rtdetr")`. Число рамок на кадре разное, поэтому они не склеиваются в одну таблицу. Для `rtdetr` картинки одного `standard_size` складываются в тензор, а метки — в список словарей `boxes` и `class_labels`. `get_collate_fn("default")` оставляет список картинок и список словарей.
 
 ```python
 import random
 
 from torch.utils.data import DataLoader, Subset
 
-from dataset import StampDataset, collate_stamps
+from dataset import StampDataset, get_collate_fn
 from dataset.transforms import Brightness, Compose, Grayscale, HorizontalFlip, VerticalFlip
 
 order = list(range(len(dataset)))
@@ -93,5 +95,5 @@ test_data = StampDataset(**common)
 train_set = Subset(train_data, train_index)
 test_set = Subset(test_data, test_index)
 
-loader = DataLoader(train_set, batch_size=8, shuffle=True, collate_fn=collate_stamps)
+loader = DataLoader(train_set, batch_size=8, shuffle=True, collate_fn=get_collate_fn("default"))
 ```

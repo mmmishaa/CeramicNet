@@ -13,16 +13,7 @@ _MODELS = ("default", "faster_rcnn", "rtdetr", "rtmdet")
 
 
 class StampDataset(Dataset):
-    """Кадры с боксами клейм из COCO.
-
-    transform(image, target) -> (image, target) вызывается на uint8 HWC.
-    target — словарь с numpy-полями boxes (N, 4) xyxy и labels (N,).
-    standard_size=(H, W) вписывает кадр в этот размер с белыми полями
-    и так же сдвигает боксы. None оставляет исходный размер.
-    model выбирает запись боксов на выходе: default, faster_rcnn, rtdetr, rtmdet.
-    negative_dirs — папки кадров без клейма. У такого кадра боксов нет.
-    В COCO боксов тоже может не быть: кадр остаётся, boxes пустой.
-    """
+    """Кадры с боксами клейм из COCO."""
 
     def __init__(
         self,
@@ -123,7 +114,35 @@ class StampDataset(Dataset):
             "scale": scale,
             "pad": pad,
         }
-        return tensor, _format_target(self.model, tensor, target)
+        return tensor, self._formatter(tensor, target)
+
+    def _formatter(self, image, target):
+        """Форматирует данные в соответствии с выбранной моделью."""
+        if self.model == "default":
+            return target
+        back = {key: target[key] for key in ("orig_size", "scale", "pad")}
+        if self.model == "faster_rcnn":
+            return {
+                "boxes": target["boxes"],
+                "labels": target["labels"],
+                "image_id": target["image_id"],
+                **back,
+            }
+        if self.model == "rtmdet":
+            return {
+                "boxes": target["boxes"],
+                "labels": target["labels"] - 1,
+                "image_id": target["image_id"],
+                **back,
+            }
+        height, width = image.shape[-2:]
+        return {
+            "boxes": _xyxy_to_cxcywh(target["boxes"], height, width),
+            "labels": target["labels"] - 1,
+            "image_id": target["image_id"],
+            "size": (int(height), int(width)),
+            **back,
+        }
 
     def _add_negatives(self):
         known = {Path(item["file_name"]).name for item in self.items}
@@ -159,19 +178,39 @@ class StampDataset(Dataset):
             next_id += 1
 
 
-def collate_stamps(batch):
-    """Список картинок и список словарей. Боксов на кадре разное число, их нельзя склеить."""
+def get_collate_fn(model="default"):
+    """Функция для DataLoader(collate_fn=...). Собирает уже отформатированные кадры в батч."""
+    if model not in _MODELS:
+        names = ", ".join(_MODELS)
+        raise ValueError(f"model должен быть одним из: {names}. Получено {model!r}")
+    if model == "rtdetr":
+        return _collate_rtdetr
+    return _collate_list
+
+def _collate_list(batch):
     images, targets = zip(*batch)
     return list(images), list(targets)
 
 
-def boxes_to_original(boxes, target):
-    """Боксы xyxy в пикселях картинки, которую видела модель -> xyxy в пикселях файла.
+def _collate_rtdetr(batch):
+    images, targets = zip(*batch)
+    if len({tuple(image.shape) for image in images}) != 1:
+        raise ValueError("для model='rtdetr' нужен standard_size: кадры разной высоты нельзя сложить в один тензор")
+    labels = []
+    for target in targets:
+        boxes = target["boxes"].clamp(0, 1)
+        if len(boxes):
+            keep = (boxes[:, 2] > 1e-4) & (boxes[:, 3] > 1e-4)
+            boxes = boxes[keep]
+            class_labels = target["labels"][keep]
+        else:
+            class_labels = target["labels"]
+        labels.append({"class_labels": class_labels.long(), "boxes": boxes})
+    return torch.stack(list(images)), labels
 
-    Снимает вписывание из standard_size: вычитает белые поля target["pad"],
-    делит на target["scale"] и обрезает по target["orig_size"].
-    Без standard_size scale = (1, 1) и pad = (0, 0): боксы только обрезаются.
-    """
+
+def boxes_to_original(boxes, target):
+    """Выполняет обратное _letterbox: возвращает боксы в координаты исходного кадра."""
     scale_h, scale_w = target["scale"]
     top, left = target["pad"]
     height, width = target["orig_size"]
@@ -216,35 +255,6 @@ def _boxes_xyxy(anns, width, height):
     if not boxes:
         return np.zeros((0, 4), dtype=np.float32), np.zeros((0,), dtype=np.int64)
     return np.asarray(boxes, dtype=np.float32), np.asarray(labels, dtype=np.int64)
-
-
-def _format_target(model, image, target):
-    if model == "default":
-        return target
-
-    back = {key: target[key] for key in ("orig_size", "scale", "pad")}
-    if model == "faster_rcnn":
-        return {
-            "boxes": target["boxes"],
-            "labels": target["labels"],
-            "image_id": target["image_id"],
-            **back,
-        }
-    if model == "rtmdet":
-        return {
-            "boxes": target["boxes"],
-            "labels": target["labels"] - 1,
-            "image_id": target["image_id"],
-            **back,
-        }
-    height, width = image.shape[-2:]
-    return {
-        "boxes": _xyxy_to_cxcywh(target["boxes"], height, width),
-        "labels": target["labels"] - 1,
-        "image_id": target["image_id"],
-        "size": (int(height), int(width)),
-        **back,
-    }
 
 
 def _xyxy_to_cxcywh(boxes, height, width):
