@@ -9,6 +9,7 @@ StampDataset(
     standard_size=None,
     model="default",
     negative_dirs=None,
+    negative_ratio=None,
 )
 ```
 
@@ -19,10 +20,13 @@ StampDataset(
 | `standard_size` | `(H, W)`. Кадр вписывается в этот размер, пустые поля белые, боксы сдвигаются вместе с пикселями. `None` — размер файла. |
 | `model` | `"default"`, `"faster_rcnn"`, `"rtdetr"` или `"rtmdet"`. От этого зависит формат боксов на выходе. |
 | `negative_dirs` | Папки снимков, на которых клейма нет. `None` — только кадры из json. |
+| `negative_ratio` | Сколько негативов взять относительно числа кадров в `root_dir`. `1.0` — столько же, `0.5` — половина. `None` — все файлы из папок. |
 
 ## negative_dirs
 
 Это папки PNG без клейма, например `ornaments` и `empty`. Такие кадры попадают в датасет с пустыми `boxes` и `labels`. Файл, чьё имя уже есть в COCO, второй раз не добавляется. Кадр из json без боксов тоже остаётся в выборке.
+
+`negative_ratio` считает лимит от кадров в root, не от размера папок. При 254 кадрах в json и `negative_ratio=1.0` добавляется 254 негатива. Набор один и тот же при каждом запуске. Если в папках файлов меньше, берутся все.
 
 ## Трансформации
 
@@ -52,6 +56,7 @@ dataset = StampDataset(
     ]),
     standard_size=(640, 640),
     negative_dirs=["Клеймы /ornaments", "Клеймы /empty"],
+    negative_ratio=1.0,
 )
 ```
 
@@ -81,6 +86,7 @@ common = dict(
     standard_size=(640, 640),
     model="default",
     negative_dirs=["Клеймы /ornaments", "Клеймы /empty"],
+    negative_ratio=1.0,
 )
 train_data = StampDataset(
     **common,

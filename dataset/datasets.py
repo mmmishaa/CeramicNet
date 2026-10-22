@@ -1,4 +1,5 @@
 import json
+import random
 import unicodedata
 from collections import defaultdict
 from pathlib import Path
@@ -22,6 +23,7 @@ class StampDataset(Dataset):
         standard_size=None,
         model="default",
         negative_dirs=None,
+        negative_ratio=0.2,
     ):
         self.root_dir = Path(root_dir)
         self.transform = transform
@@ -30,6 +32,15 @@ class StampDataset(Dataset):
             raise ValueError(f"model должен быть одним из: {names}. Получено {model!r}")
         self.model = model
         self.negative_dirs = tuple(Path(path) for path in (negative_dirs or ()))
+        if negative_ratio is None:
+            self.negative_ratio = None
+        else:
+            negative_ratio = float(negative_ratio)
+            if negative_ratio < 0:
+                raise ValueError(
+                    f"negative_ratio — доля от числа кадров в root, получено {negative_ratio}"
+                )
+            self.negative_ratio = negative_ratio
         if standard_size is None:
             self.standard_size = None
         else:
@@ -145,6 +156,7 @@ class StampDataset(Dataset):
         }
 
     def _add_negatives(self):
+        n_root = len(self.items)
         known = {Path(item["file_name"]).name for item in self.items}
         next_id = max((item["image_id"] for item in self.items), default=0) + 1
         paths = []
@@ -156,12 +168,20 @@ class StampDataset(Dataset):
                 if path.is_file() and path.suffix.lower() == ".png"
             )
         paths.sort(key=lambda path: unicodedata.normalize("NFC", str(path)))
+        chosen = []
         for path in paths:
             name = unicodedata.normalize("NFC", path.name)
             if name in known:
                 continue
-            cipher, shot = _cipher_and_shot(name)
             known.add(name)
+            chosen.append(path)
+        if self.negative_ratio is not None:
+            limit = round(n_root * self.negative_ratio)
+            random.Random(0).shuffle(chosen)
+            chosen = chosen[:limit]
+        for path in chosen:
+            name = unicodedata.normalize("NFC", path.name)
+            cipher, shot = _cipher_and_shot(name)
             with Image.open(path) as image:
                 width, height = image.size
             self.items.append({
