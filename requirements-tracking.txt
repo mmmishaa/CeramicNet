@@ -1,0 +1,2 @@
+# Optional experiment tracking shared by detection and matching.
+clearml>=1.16

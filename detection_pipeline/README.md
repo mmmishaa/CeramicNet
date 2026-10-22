@@ -168,6 +168,29 @@ python -m detection_pipeline.train_native mmdet --repo /absolute/path/mmdetectio
 В MMDetection технический test_dataloader указывает на val; независимым test он
 не является.
 
+## Графики обучения и ClearML
+
+Добавлен общий модуль experiment_tracking, который также можно использовать
+в будущей задаче сопоставления изображений и названий/ID клейм.
+
+```bash
+python -m pip install -r requirements-tracking.txt
+clearml-init
+```
+
+К существующей команде train_fasterrcnn или train_native добавьте
+--tracking clearml --run-name ИМЯ_ОПЫТА. Для локальной проверки SDK без сервера
+используйте --tracking offline; по умолчанию выбран local без зависимости от SDK.
+Проект — CeramicNet/detection, а следующий этап использует CeramicNet/matching.
+Каждый запуск записывает хеш своих реальных train/val файлов, параметры и метрики.
+Split детекции не навязывается следующей задаче.
+
+Faster R-CNN передаёт loss/компоненты, lr и общие validation метрики напрямую;
+для native моделей графики читаются из штатных JSONL логов. Они отображаются
+в val_native; финальную таблицу строит общий evaluate/compare.
+Подробности настройки, ограничения native форматов и пример для matching:
+[experiment_tracking/README.md](../experiment_tracking/README.md).
+
 ## Общая оценка
 
 Экспорт обученного checkpoint и оценка на val:
