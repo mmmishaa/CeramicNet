@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from dataset import StampDataset, collate_stamps
+from dataset import StampDataset, get_collate_fn
 from dataset.transforms.factory import build_augmentations
 
 
@@ -27,7 +27,7 @@ def seed_worker(worker_id):
     np.random.seed(seed)
 
 
-collate_detection = collate_stamps
+collate_detection = get_collate_fn("faster_rcnn")
 
 
 def build_transforms(profile="light", train=False, operations=None):
@@ -39,7 +39,8 @@ class CocoStampDataset(StampDataset):
     """Keep the pipeline API; image/bbox reading lives in StampDataset."""
     def __init__(self, images_root, ann_file, transforms=None):
         super().__init__(root_dir=images_root, ann_file=ann_file, image_root=images_root,
-                         transform=transforms, standard_size=None, model="faster_rcnn")
+                         transform=transforms, standard_size=None, model="faster_rcnn",
+                         negative_dirs=None, negative_ratio=0)
         self.categories = [{"id": category_id, "name": name} for category_id, name in self.categories.items()]
 
     def __getitem__(self, index):

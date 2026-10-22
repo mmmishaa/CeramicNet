@@ -9,8 +9,10 @@ StampDataset(
     standard_size=None,
     model="default",
     negative_dirs=None,
+    negative_ratio=0.2,
     ann_file=None,
     image_root=None,
+    negative_seed=42,
 )
 ```
 
@@ -23,6 +25,8 @@ StampDataset(
 | `ann_file` | Явный COCO JSON для train или val. None — прежний путь внутри root_dir. |
 | `image_root` | Корень относительно file_name из COCO. None — images/default внутри root_dir. |
 | `negative_dirs` | Папки снимков, на которых клейма нет. `None` — только кадры из json. |
+| `negative_ratio` | Лимит внешних негативов относительно числа кадров COCO. По умолчанию 0.2; 0 — не добавлять, 1.0 — столько же, None — все доступные файлы. |
+| `negative_seed` | Seed отбора внешних негативов: 42 по умолчанию; 0 воспроизводит прежний отбор datasets. |
 
 ## Метки классов
 
@@ -34,6 +38,13 @@ model="default" возвращает исходные ID. faster_rcnn возвр
 ## negative_dirs
 
 Это папки с вручную проверенными фотографиями без клейма. Одно название папки `ornaments` или `empty` не подтверждает отсутствие клейма. Такие кадры попадают в датасет с пустыми `boxes` и `labels`. Файл, чьё имя уже есть в COCO, второй раз не добавляется. Кадр из json без боксов тоже остаётся в выборке.
+
+`negative_ratio` считает лимит от числа кадров COCO, не от размера папок.
+При 254 кадрах и negative_ratio=1.0 берётся до 254 проверенных негативов;
+при значении по умолчанию 0.2 — до 51 (round(254 * 0.2)). None берёт все
+доступные файлы. Аннотированные имена и повторяющиеся имена кандидатов исключаются
+до отбора. negative_seed=42 задаёт воспроизводимую выборку. Для общего benchmark
+отбор выполняется при подготовке данных до разбиения, а не в каждом Dataset.
 
 ## Трансформации
 
@@ -64,8 +75,22 @@ dataset = StampDataset(
     ]),
     standard_size=(640, 640),
     negative_dirs=["/path/verified_negatives"],
+    negative_ratio=1.0,
+    negative_seed=42,
 )
 ```
+
+## Коллаторы
+
+get_collate_fn("default"), get_collate_fn("faster_rcnn") и get_collate_fn("rtmdet")
+возвращают список изображений и список targets, сохраняя image_id и метаданные.
+get_collate_fn("rtdetr") складывает одинаковые по размеру изображения в один tensor
+и возвращает targets с boxes/class_labels. При разном размере кадров нужен
+standard_size. Этот вариант предназначен для кода, ожидающего именно такой контракт.
+
+Официальный lyuwenyu RT-DETR в нашем benchmark использует свой штатный
+BatchImageCollateFunction: ему нужны labels, image_id и orig_size. Переходник
+TeamCocoDetection сохраняет этот формат; generic rtdetr-коллатор туда не подставляется.
 
 ## Общие train и val
 

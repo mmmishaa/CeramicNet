@@ -23,6 +23,7 @@ class TeamCocoDetection(CocoDetection):
         super().__init__(img_folder, ann_file, transforms, return_masks, remap_mscoco_category)
         self.stamps = StampDataset(img_folder, ann_file=ann_file, image_root=img_folder,
                                    model="default", standard_size=None,
+                                   negative_dirs=None, negative_ratio=0,
                                    transform=build_augmentations(operations=augmentation_ops or []))
         if [item["image_id"] for item in self.stamps.items] != self.ids:
             raise ValueError("COCO evaluator IDs and StampDataset IDs disagree")

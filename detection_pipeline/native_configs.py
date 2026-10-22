@@ -50,6 +50,8 @@ def generate(splits, images, output, rtdetr_repo=None, mmdet_repo=None, profile=
                 dataset["transforms"] = {"type": "Compose", "ops": ops, "policy": {"name": "default"}}
             config[f"{split}_dataloader"] = {"dataset": dataset, "total_batch_size": batch_size,
                                                 "num_workers": 2, "drop_last": False}
+        # The official trainer requires labels/image_id/orig_size, whereas the
+        # standalone get_collate_fn("rtdetr") returns class_labels and boxes.
         config["train_dataloader"]["collate_fn"] = {"type": "BatchImageCollateFunction", "scales": None}
         path = output / f"rtdetrv2_s_{profile}.yml"
         path.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

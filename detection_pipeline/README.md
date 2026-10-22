@@ -1,6 +1,7 @@
 # Универсальный пайплайн CeramicNet
 
-Ветка `pipeline` построена от `datasets` (исходный commit `c3b1e54`).
+Ветка `pipeline` построена от `datasets` (исходный commit `c3b1e54`)
+и объединена с обновлением `datasets` до `f1d8d39`.
 Пайплайн использует настоящий `dataset.StampDataset` и аугментации коллег.
 Ноутбук для работы: `train_pipelines/universal_detection.ipynb`.
 
@@ -64,6 +65,14 @@ python -m detection_pipeline.data --annotations /path/instances_default.json \
 как images без annotations ДО разбиения. Не передавайте одни и те же negative_dirs
 в уже разделённые train и val. Отсутствие аннотаций на непроверенном фото не означает,
 что клейма нет. В текущем split доля срабатываний на отрицательных кадрах — null.
+
+Новый параметр StampDataset.negative_ratio поддерживается для отдельной подготовки
+данных. negative_seed=42 задаёт воспроизводимый отбор (0 — старый seed datasets).
+Адаптеры benchmark явно задают negative_ratio=0 и не добавляют внешние папки:
+негативы, уже записанные в общем COCO, сохраняются. Для torchvision используется
+get_collate_fn("faster_rcnn"); официальный RT-DETR сохраняет свой collate с
+labels/image_id/orig_size. Новый generic get_collate_fn("rtdetr") выдаёт
+class_labels и boxes и в этот официальный backend не подставляется.
 
 Независимого test нет. На val выбираем checkpoint/аугментации/порог, затем фиксируем
 их и оцениваем на отдельно собранном test без предметов из train/val.

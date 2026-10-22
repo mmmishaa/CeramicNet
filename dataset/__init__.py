@@ -1,4 +1,4 @@
-from .datasets import StampDataset, boxes_to_original, collate_stamps
+from .datasets import StampDataset, boxes_to_original, get_collate_fn
 from .transforms import (
     Brightness,
     Compose,
@@ -23,5 +23,5 @@ __all__ = [
     "StampDataset",
     "VerticalFlip",
     "boxes_to_original",
-    "collate_stamps",
+    "get_collate_fn",
 ]

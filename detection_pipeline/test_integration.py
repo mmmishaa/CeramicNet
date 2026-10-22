@@ -8,7 +8,7 @@ import numpy as np
 from PIL import Image
 import torch
 
-from dataset import StampDataset, Rotate90, boxes_to_original
+from dataset import StampDataset, Rotate90, boxes_to_original, get_collate_fn
 from dataset.transforms.factory import build_augmentations
 from .data import write_json
 from .datasets import CocoStampDataset, make_datasets
@@ -99,6 +99,68 @@ class TeamIntegrationTests(unittest.TestCase):
             build_augmentations(operations=[{"type": "Unknown"}])
         with self.assertRaises(ValueError):
             build_augmentations(operations=[{"type": "Brightness", "p": 2}])
+
+    def test_new_collate_interfaces_preserve_labels_and_empty_targets(self):
+        for model in ("default", "faster_rcnn", "rtmdet", "rtdetr"):
+            ds = self.dataset(model, standard_size=(64, 64))
+            images, targets = get_collate_fn(model)([ds[0], ds[1]])
+            if model == "rtdetr":
+                self.assertEqual(images.shape, (2, 3, 64, 64))
+                self.assertEqual(targets[0]["class_labels"].tolist(), [0])
+                self.assertEqual(targets[1]["boxes"].shape, (0, 4))
+                self.assertEqual(targets[1]["class_labels"].dtype, torch.int64)
+                torch.testing.assert_close(targets[0]["boxes"], ds[0][1]["boxes"])
+            else:
+                self.assertIsInstance(images, list)
+                self.assertEqual(len(images), 2)
+                expected = 1 if model == "faster_rcnn" else 0
+                self.assertEqual(targets[0]["labels"].tolist(), [expected])
+                self.assertEqual(targets[1]["boxes"].shape, (0, 4))
+                self.assertIn("image_id", targets[0])
+
+    def test_rtdetr_collate_rejects_mixed_image_sizes(self):
+        ds = self.dataset("rtdetr")
+        image, target = ds[0]
+        with self.assertRaisesRegex(ValueError, "standard_size"):
+            get_collate_fn("rtdetr")([(image, target), (image[:, :, :32], target)])
+        with self.assertRaises(ValueError):
+            get_collate_fn("unknown")
+
+    def make_negative_folder(self):
+        folder = self.root / "verified_negatives"
+        folder.mkdir()
+        for index in range(8):
+            Image.new("RGB", (64, 32), (index, 30, 40)).save(folder / f"negative{index:02d}_1.png")
+        # An annotated filename accidentally repeated in the folder must be skipped.
+        (folder / "a_1.png").write_bytes((self.root / "a_1.png").read_bytes())
+        return folder
+
+    def test_negative_ratio_limits_preserve_negatives_already_in_coco(self):
+        folder = self.make_negative_folder()
+        for ratio, added in [(0, 0), (0.5, 1), (1.0, 2), (None, 8), (100, 8)]:
+            ds = self.dataset("faster_rcnn", negative_dirs=[folder], negative_ratio=ratio)
+            self.assertEqual(len(ds), 2 + added)
+            self.assertEqual(ds[1][1]["boxes"].shape, (0, 4))
+            for index in range(2, len(ds)):
+                self.assertEqual(ds[index][1]["labels"].numel(), 0)
+            ids = [item["image_id"] for item in ds.items]
+            self.assertEqual(len(ids), len(set(ids)))
+
+    def test_negative_selection_seed_and_annotated_name_deduplication(self):
+        folder = self.make_negative_folder()
+        first = self.dataset("default", negative_dirs=[folder], negative_ratio=1)
+        second = self.dataset("default", negative_dirs=[folder], negative_ratio=1, negative_seed=42)
+        names = lambda ds: [Path(item["file_name"]).name for item in ds.items[2:]]
+        self.assertEqual(names(first), names(second))
+        self.assertEqual(set(names(first)), {"negative03_1.png", "negative04_1.png"})
+        legacy = self.dataset("default", negative_dirs=[folder], negative_ratio=1, negative_seed=0)
+        self.assertEqual(set(names(legacy)), {"negative04_1.png", "negative01_1.png"})
+        self.assertNotIn("a_1.png", names(first))
+
+    def test_invalid_negative_ratios_are_rejected(self):
+        for ratio in [-1, float("nan"), float("inf")]:
+            with self.assertRaises(ValueError):
+                self.dataset("default", negative_ratio=ratio)
 
 
 if __name__ == "__main__":
