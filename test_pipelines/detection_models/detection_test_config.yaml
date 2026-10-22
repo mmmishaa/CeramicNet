@@ -1,7 +1,7 @@
 dataset:
-  coco_json: ceramic_dataset/instances_default.json
+  coco_json: ceramic_dataset/annotations/instances_default.json
   images_dir: ceramic_dataset/images
-  negatives_dir: ceramic_dataset/negative_images
+  negatives_dir: ceramic_dataset/negatives
   random_state: 42
   train: 0.8
   val: 0.2
@@ -13,10 +13,14 @@ confidence_config:
 models:
   - name: "yolo26s_without_neg"
     type: "onnx"
-    weights_path: "../train_pipelines/detection_models/model_weights/ceramic_yolo26s_without_neg.onnx"
+    process_file: "test_pipelines/detection_models/detection_configs/yolo_processing.py"
+    process_class: "YOLOProcessing"
+    weights_path: "train_pipelines/detection_models/model_weights/ceramic_yolo26s_without_neg.onnx"
     imgsz: 640
 
   - name: "yolo26s_with_neg"
     type: "onnx"
-    weithts_path: "../train_pipelines/detection_models/model_weights/ceramic_yolo26s_with_neg.onnx"
+    process_file: "test_pipelines/detection_models/detection_configs/yolo_processing.py"
+    process_class: "YOLOProcessing"
+    weights_path: "train_pipelines/detection_models/model_weights/ceramic_yolo26s_with_neg.onnx"
     imgsz: 640

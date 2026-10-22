@@ -1,8 +1,8 @@
+from collections import defaultdict
 import json
+from pathlib import Path
 import random
 import unicodedata
-from collections import defaultdict
-from pathlib import Path
 
 import cv2
 import numpy as np
@@ -10,62 +10,80 @@ from PIL import Image
 from torch.utils.data import Dataset
 
 
-class TestCeramicDataset(Dataset):
-    """Универсальный тестовый датасет для бенчмаркинга моделей детекции.
-
-    Возвращает сырой numpy-кадр и Ground Truth боксы [x1, y1, x2, y2]
-    в оригинальных пикселях снимка.
-    """
+class TestDetectionDataset(Dataset):
 
     def __init__(
         self,
-        root_dir: str | Path,
+        images_dir: str | Path,
+        ann_file: str | Path,
         negative_dirs: list[str | Path] | tuple[str | Path, ...] | None = None,
         negative_ratio: float | None = 0.2,
         as_bgr: bool = True,
+        split: str | None = "val",
+        val_ratio: float = 0.2,
+        random_state: int = 42,
     ):
-        self.root_dir = Path(root_dir)
+        self.images_root = Path(images_dir)
+        self.ann_path = Path(ann_file)
         self.as_bgr = as_bgr
-        self.negative_dirs = tuple(Path(path) for path in (negative_dirs or ()))
-        self.negative_ratio = float(negative_ratio) if negative_ratio is not None else None
+        self.negative_dirs = tuple(Path(p) for p in (negative_dirs or ()))
+        self.negative_ratio = (
+            float(negative_ratio) if negative_ratio is not None else None
+        )
 
-        ann_path = self.root_dir / "annotations" / "instances_default.json"
-        image_root = self.root_dir / "images" / "default"
+        if not self.ann_path.is_file():
+            raise FileNotFoundError(f"Файл аннотаций не найден: {self.ann_path}")
 
-        if not ann_path.is_file():
-            raise FileNotFoundError(f"Файл аннотаций не найден: {ann_path}")
+        if not self.images_root.is_dir():
+            raise FileNotFoundError(
+                f"Папка с изображениями не найдена: {self.images_root}"
+            )
 
-        raw = json.loads(ann_path.read_text(encoding="utf-8"))
-        self.categories = {int(cat["id"]): str(cat["name"]) for cat in raw["categories"]}
-        paths = self._index_pngs(image_root)
+        raw = json.loads(self.ann_path.read_text(encoding="utf-8"))
+        self.categories = {
+            int(cat["id"]): str(cat["name"]) for cat in raw["categories"]
+        }
+        paths = self._index_pngs(self.images_root)
 
         grouped = defaultdict(list)
         for ann in raw["annotations"]:
             grouped[int(ann["image_id"])].append(ann)
 
-        self.items = []
+        all_items = []
         missing = []
-        for image_info in sorted(raw["images"], key=lambda item: int(item["id"])):
-            file_name = unicodedata.normalize("NFC", str(image_info["file_name"]).replace("\\", "/"))
-            cipher, shot = self._cipher_and_shot(file_name)
-            path = paths.get(file_name)
-            if path is None:
-                missing.append(file_name)
-                continue
 
-            boxes, labels = self._boxes_xyxy(
-                grouped.get(int(image_info["id"]), []),
-                int(image_info["width"]),
-                int(image_info["height"]),
+        for img_info in sorted(raw["images"], key=lambda item: int(item["id"])):
+            raw_file_name = str(img_info["file_name"]).replace("\\", "/")
+            norm_file_name = unicodedata.normalize("NFC", raw_file_name)
+            base_name = unicodedata.normalize(
+                "NFC", Path(norm_file_name).name
             )
 
-            self.items.append(
+            path = (
+                paths.get(norm_file_name)
+                or paths.get(base_name)
+                or paths.get(f"stamps/{base_name}")
+            )
+
+            if path is None:
+                missing.append(norm_file_name)
+                continue
+
+            cipher, shot = self._cipher_and_shot(base_name)
+
+            boxes, labels = self._boxes_xyxy(
+                grouped.get(int(img_info["id"]), []),
+                int(img_info["width"]),
+                int(img_info["height"]),
+            )
+
+            all_items.append(
                 {
                     "path": path,
-                    "file_name": file_name,
-                    "image_id": int(image_info["id"]),
-                    "width": int(image_info["width"]),
-                    "height": int(image_info["height"]),
+                    "file_name": norm_file_name,
+                    "image_id": int(img_info["id"]),
+                    "width": int(img_info["width"]),
+                    "height": int(img_info["height"]),
                     "cipher": cipher,
                     "shot": shot,
                     "boxes": boxes,
@@ -74,9 +92,27 @@ class TestCeramicDataset(Dataset):
             )
 
         if missing:
-            raise FileNotFoundError(f"В {image_root} отсутствуют кадры, например: {missing[0]}")
+            raise FileNotFoundError(
+                f"В директории {self.images_root} не найдены изображения из COCO JSON (всего {len(missing)} шт).\n"
+                f"Пример отсутствующего файла: '{missing[0]}'"
+            )
 
-        self._add_negatives()
+        if split in ("train", "val") and 0.0 < val_ratio < 1.0:
+            indices = list(range(len(all_items)))
+            random.Random(random_state).shuffle(indices)
+
+            n_val = max(1, round(len(all_items) * val_ratio))
+            val_indices = set(indices[:n_val])
+
+            if split == "val":
+                self.items = [all_items[i] for i in sorted(val_indices)]
+            else:
+                train_indices = set(indices[n_val:])
+                self.items = [all_items[i] for i in sorted(train_indices)]
+        else:
+            self.items = all_items
+
+        self._add_negatives(split=split, val_ratio=val_ratio, random_state=random_state)
 
     def __len__(self) -> int:
         return len(self.items)
@@ -84,8 +120,9 @@ class TestCeramicDataset(Dataset):
     def __getitem__(self, idx: int) -> tuple[np.ndarray, dict]:
         item = self.items[idx]
 
-        # Чтение кадра в исходном разрешении
-        image = cv2.imread(str(item["path"]))
+        file_bytes = np.fromfile(str(item["path"]), dtype=np.uint8)
+        image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+
         if image is None:
             with Image.open(item["path"]) as pil_img:
                 image = np.array(pil_img.convert("RGB"), dtype=np.uint8)
@@ -106,7 +143,9 @@ class TestCeramicDataset(Dataset):
 
         return image, target
 
-    def _boxes_xyxy(self, anns: list[dict], width: int, height: int) -> tuple[np.ndarray, np.ndarray]:
+    def _boxes_xyxy(
+        self, anns: list[dict], width: int, height: int
+    ) -> tuple[np.ndarray, np.ndarray]:
         boxes, labels = [], []
         for ann in sorted(anns, key=lambda item: int(item["id"])):
             x, y, w, h = (float(v) for v in ann["bbox"])
@@ -122,21 +161,30 @@ class TestCeramicDataset(Dataset):
             labels.append(int(ann["category_id"]))
 
         if not boxes:
-            return np.empty((0, 4), dtype=np.float32), np.empty((0,), dtype=np.int64)
+            return np.empty((0, 4), dtype=np.float32), np.empty(
+                (0,), dtype=np.int64
+            )
 
-        return np.asarray(boxes, dtype=np.float32), np.asarray(labels, dtype=np.int64)
+        return np.asarray(boxes, dtype=np.float32), np.asarray(
+            labels, dtype=np.int64
+        )
 
-    def _add_negatives(self) -> None:
-        n_root = len(self.items)
+    def _add_negatives(
+        self, split: str | None, val_ratio: float, random_state: int
+    ) -> None:
+        n_pos = len(self.items)
         known = {Path(item["file_name"]).name for item in self.items}
         next_id = max((item["image_id"] for item in self.items), default=0) + 1
 
         paths = []
         for folder in self.negative_dirs:
             if not folder.is_dir():
-                raise FileNotFoundError(f"Папка с негативами не найдена: {folder}")
+                raise FileNotFoundError(
+                    f"Папка с негативами не найдена: {folder}"
+                )
             paths.extend(
-                p for p in folder.rglob("*")
+                p
+                for p in folder.rglob("*")
                 if p.is_file() and p.suffix.lower() == ".png"
             )
 
@@ -149,9 +197,22 @@ class TestCeramicDataset(Dataset):
             known.add(name)
             chosen.append(path)
 
+        if split in ("train", "val") and 0.0 < val_ratio < 1.0:
+            indices = list(range(len(chosen)))
+            random.Random(random_state).shuffle(indices)
+
+            n_val = max(1, round(len(chosen) * val_ratio))
+            val_indices = set(indices[:n_val])
+
+            if split == "val":
+                chosen = [chosen[i] for i in sorted(val_indices)]
+            else:
+                train_indices = set(indices[n_val:])
+                chosen = [chosen[i] for i in sorted(train_indices)]
+
         if self.negative_ratio is not None and chosen:
-            limit = round(n_root * self.negative_ratio)
-            random.Random(0).shuffle(chosen)
+            limit = round(n_pos * self.negative_ratio)
+            random.Random(random_state).shuffle(chosen)
             chosen = chosen[:limit]
 
         for path in chosen:
@@ -181,15 +242,21 @@ class TestCeramicDataset(Dataset):
         for path in Path(image_root).rglob("*"):
             if not path.is_file() or path.suffix.lower() != ".png":
                 continue
-            key = unicodedata.normalize("NFC", path.relative_to(image_root).as_posix())
-            if key in found:
-                raise ValueError(f"Дублирующееся NFC имя: {key}")
-            found[key] = path
+
+            rel_key = unicodedata.normalize(
+                "NFC", path.relative_to(image_root).as_posix()
+            )
+            found[rel_key] = path
+
+            base_key = unicodedata.normalize("NFC", path.name)
+            found[base_key] = path
+
         return found
 
     @staticmethod
     def _cipher_and_shot(file_name: str) -> tuple[str, int]:
-        stem = Path(unicodedata.normalize("NFC", Path(file_name).name)).stem
+        base_name = Path(unicodedata.normalize("NFC", file_name)).name
+        stem = Path(base_name).stem
         cipher, separator, shot = stem.rpartition("_")
         if separator == "" or cipher == "" or not shot.isdigit():
             raise ValueError(f"Имя кадра не в формате ШИФР_N.png: {file_name}")
