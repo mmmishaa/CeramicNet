@@ -22,8 +22,8 @@ PROJECT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT))
 
 from detection_pipeline.adapters import mmdet_prediction
-from detection_pipeline.data import read_json, validate_coco, write_json
-from detection_pipeline.evaluate import evaluate, save_predictions
+from detection_pipeline.data import read_json, validate_coco, write_json, tracking_split_files
+from detection_pipeline.evaluate import annotations_digest, evaluate, save_predictions
 
 
 def evaluation_data(splits, scope):
@@ -107,8 +107,18 @@ def run(config, checkpoint, images_root, splits, repo, output, scope="val",
         raise FileExistsError(f"Choose a new output directory: {output}")
     if not config.is_file() or not checkpoint.is_file():
         raise FileNotFoundError("Supply an existing config and trained checkpoint")
+    metadata = read_json(config.with_suffix(".metadata.json"))
+    manifest = read_json(splits / "manifest.json")
+    if metadata.get("split_fingerprint") != manifest["fingerprint"]:
+        raise ValueError("Checkpoint config belongs to another split; use a run trained on the current v3 protocol")
+    actual_hashes = {name: hashlib.sha256(Path(path).read_bytes()).hexdigest()
+                     for name, path in tracking_split_files(splits / "train.json", splits / "val.json").items()}
+    if metadata.get("split_files_sha256") != actual_hashes:
+        raise ValueError("Saved split identity does not match training metadata")
     if validation_metrics:
         previous = read_json(validation_metrics)
+        if previous["annotations_sha256"] != annotations_digest(read_json(splits / "val.json")):
+            raise ValueError("Threshold was selected on another validation set")
         selected = previous.get("threshold_search_on_validation", {}).get("selected")
         if selected:
             threshold = selected["threshold"]
@@ -155,7 +165,6 @@ def run(config, checkpoint, images_root, splits, repo, output, scope="val",
     output.mkdir(parents=True)
     annotations = output / "annotations.json"
     write_json(annotations, data)
-    metadata = read_json(config.with_suffix(".metadata.json")) if config.with_suffix(".metadata.json").is_file() else {}
     metadata.update(description, checkpoint=str(checkpoint), checkpoint_sha256=hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
                     config_path=str(config), device=device, threshold=threshold,
                     threshold_source=str(validation_metrics) if validation_metrics else "fixed parameter",
@@ -191,7 +200,7 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--images", dest="images_root", required=True)
     parser.add_argument("--repo", default=str(PROJECT / ".local/rtmdet/mmdetection"))
-    parser.add_argument("--splits", default=str(PROJECT / "detection_pipeline/splits/v2_seed42_neg50"))
+    parser.add_argument("--splits", default=str(PROJECT / "detection_pipeline/splits/v3_seed42_reserve80_active15"))
     parser.add_argument("--scope", choices=["val", "stamps"], default="val")
     parser.add_argument("--validation-metrics")
     parser.add_argument("--threshold", type=float, default=0.5)
