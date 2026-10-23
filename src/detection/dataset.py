@@ -9,7 +9,6 @@ import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset
 
-
 class TestDetectionDataset(Dataset):
 
     def __init__(
@@ -59,11 +58,7 @@ class TestDetectionDataset(Dataset):
                 "NFC", Path(norm_file_name).name
             )
 
-            path = (
-                paths.get(norm_file_name)
-                or paths.get(base_name)
-                or paths.get(f"stamps/{base_name}")
-            )
+            path = paths.get(norm_file_name) or paths.get(base_name)
 
             if path is None:
                 missing.append(norm_file_name)
@@ -224,7 +219,6 @@ class TestDetectionDataset(Dataset):
             if split == "val":
                 val_pool = [unique_paths[i] for i in sorted(val_indices)]
                 
-                # Отбираем детерминированно квоту (50% от позитивов / количество папок)
                 sample_rng = random.Random(folder_seed + 2)
                 sample_rng.shuffle(val_pool)
                 selected = val_pool[:quota_per_val_folder]
@@ -251,10 +245,11 @@ class TestDetectionDataset(Dataset):
             with Image.open(path) as img:
                 w, h = img.size
 
+            parent_name = unicodedata.normalize("NFC", path.parent.name)
             self.items.append(
                 {
                     "path": path,
-                    "file_name": f"{unicodedata.normalize('NFC', path.parent.name)}/{name}",
+                    "file_name": f"{parent_name}/{name}",
                     "image_id": next_id,
                     "width": w,
                     "height": h,

@@ -1,3 +1,4 @@
-detection_model_weights/
+weights/
 __pycache__
 ceramic_dataset
+reports/

@@ -13,24 +13,13 @@ import yaml
 
 os.environ["OPENCV_LOG_LEVEL"] = "ERROR"
 
-from detection_configs.test_detection_dataset import TestDetectionDataset
+from src.paths import ROOT_DIR, REPORTS_DIR, CONFIGS_DIR
+from src.detection.dataset import TestDetectionDataset
 
-
-def load_processor(file_path_str: str, class_name: str):
-    file_path = Path(file_path_str)
-    if not file_path.is_file():
-        raise FileNotFoundError(f"Файл процессора не найден: {file_path}")
-
-    spec = importlib.util.spec_from_file_location(file_path.stem, file_path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"Не удалось загрузить модуль из {file_path}")
-
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
+def load_processor(module_path: str, class_name: str):
+    module = importlib.import_module(module_path)
     if not hasattr(module, class_name):
-        raise AttributeError(f"В {file_path} не найден класс '{class_name}'")
-
+        raise AttributeError(f"В модуле '{module_path}' не найден класс '{class_name}'")
     processor_cls = getattr(module, class_name)
     return processor_cls()
 
@@ -114,7 +103,6 @@ def evaluate_detections(records: list[dict], iou_thresh: float = 0.5) -> dict:
 
     iou_thresholds = np.linspace(0.5, 0.95, 10)
     aps = []
-
     point_tp = 0
 
     for iou_idx, cur_iou in enumerate(iou_thresholds):
@@ -180,6 +168,7 @@ def evaluate_detections(records: list[dict], iou_thresh: float = 0.5) -> dict:
 
 
 def update_results_csv(output_path: Path, new_rows: list[dict]) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     headers = [
         "Model",
         "Timestamp",
@@ -227,7 +216,8 @@ def update_results_csv(output_path: Path, new_rows: list[dict]) -> None:
 
 
 def parse_args():
-    default_config = "test_pipelines/detection_models/detection_test_config.yaml"
+    default_config = CONFIGS_DIR / "detection" / "detection_test_config.yaml"
+    default_csv = REPORTS_DIR / "detection_test_results.csv"
 
     parser = argparse.ArgumentParser(
         description="Бенчмарк моделей детекции из YAML-конфига"
@@ -259,20 +249,17 @@ def parse_args():
     parser.add_argument(
         "--output_csv",
         type=str,
-        default="test_pipelines/detection_models/benchmark_results.csv",
+        default=str(default_csv),
         help="Путь к файлу сохранения результатов",
     )
     return parser.parse_args()
 
-
 def main():
     args = parse_args()
-    config_path = Path(args.config)
+    config_path = ROOT_DIR / args.config
 
     if not config_path.is_file():
-        raise FileNotFoundError(
-            f"Конфигурационный файл не найден: {config_path}"
-        )
+        raise FileNotFoundError(f"Конфигурационный файл не найден: {config_path}")
 
     with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
@@ -288,14 +275,14 @@ def main():
     )
 
     dataset_cfg = config["dataset"]
-    coco_json = Path(dataset_cfg["coco_json"])
-    images_dir = Path(dataset_cfg["images_dir"])
+    coco_json = ROOT_DIR / dataset_cfg["coco_json"]
+    images_dir = ROOT_DIR / dataset_cfg["images_dir"]
     val_ratio = float(dataset_cfg.get("val", 0.2))
     random_state = int(dataset_cfg.get("random_state", 42))
 
     negative_dirs = []
     if dataset_cfg.get("negatives_dir"):
-        neg_base = Path(dataset_cfg["negatives_dir"])
+        neg_base = ROOT_DIR / dataset_cfg["negatives_dir"]
         for sub_name in ["empty", "ornaments"]:
             target_sub = neg_base / sub_name
             if target_sub.is_dir():
@@ -317,9 +304,7 @@ def main():
     models_to_test = config["models"]
     target_model_name = args.model or config.get("run_only")
     if target_model_name:
-        models_to_test = [
-            m for m in models_to_test if m["name"] == target_model_name
-        ]
+        models_to_test = [m for m in models_to_test if m["name"] == target_model_name]
         if not models_to_test:
             available = [m["name"] for m in config["models"]]
             raise ValueError(
@@ -336,30 +321,26 @@ def main():
 
     for model_cfg in models_to_test:
         name = model_cfg["name"]
-        weights_path = (
-            model_cfg.get("weights_path")
-            or model_cfg.get("weithts_path")
-            or model_cfg.get("weitgts_path")
-        )
-        process_file = model_cfg.get("process_file")
+        raw_weights = model_cfg.get("weights_path")
+        weights_path = ROOT_DIR / raw_weights if raw_weights else None
+        
+        process_target = model_cfg.get("processor_module") or model_cfg.get("process_file")
         process_class = model_cfg.get("process_class")
         imgsz = int(model_cfg.get("imgsz", 640))
 
-        if not weights_path or not Path(weights_path).is_file():
+        if not weights_path or not weights_path.is_file():
             print(f"\n[ОШИБКА] Файл весов для {name} не найден: {weights_path}")
             continue
 
-        if not process_file or not process_class:
-            print(
-                f"\n[ОШИБКА] Для модели {name} не указаны 'process_file' или 'process_class'"
-            )
+        if not process_target or not process_class:
+            print(f"\n[ОШИБКА] Для модели {name} не указаны процессор или класс")
             continue
 
-        processor = load_processor(process_file, process_class)
+        processor = load_processor(process_target, process_class)
 
         print(f"\nЗапуск модели: {name}")
         print(f"Веса: {weights_path}")
-        print(f"Класс процессора: {process_class} ({process_file})")
+        print(f"Класс процессора: {process_class} ({process_target})")
 
         available = ort.get_available_providers()
         providers = [p for p in ["CUDAExecutionProvider", "CPUExecutionProvider"] if p in available]
@@ -413,9 +394,7 @@ def main():
         print(f"  Recall:    {metrics['recall']:.4f}")
         print(f"  F1-Score:  {metrics['f1']:.4f}")
         print(f"  Latency:   {mean_ms:.2f} ms ({fps:.1f} FPS)")
-        print(
-            f"  TP: {metrics['true_positives']} | Total Pred: {metrics['total_pred']} | Total GT: {metrics['total_gt']}"
-        )
+        print(f"  TP: {metrics['true_positives']} | Total Pred: {metrics['total_pred']} | Total GT: {metrics['total_gt']}")
 
         new_results.append(
             {
@@ -435,7 +414,8 @@ def main():
         )
 
     if new_results:
-        update_results_csv(Path(args.output_csv), new_results)
+        out_csv = ROOT_DIR / args.output_csv
+        update_results_csv(out_csv, new_results)
 
 if __name__ == "__main__":
     main()

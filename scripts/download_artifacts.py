@@ -4,18 +4,20 @@ import shutil
 import zipfile
 import gdown
 
+from src.paths import ROOT_DIR, DATA_DIR, WEIGHTS_DIR
+
 def main():
     parser = argparse.ArgumentParser(description="artifact synchronization")
     parser.add_argument("--folder_id", type=str, required=True)
     args = parser.parse_args()
 
-    repo_root = Path(__file__).resolve().parent
-    temp_dir = repo_root / "_temp_sync"
-    dataset_target = repo_root / "ceramic_dataset"
-    weights_target = repo_root / "train_pipelines" / "detection_models" / "detection_model_weights"
+    temp_dir = ROOT_DIR / "_temp_sync"
     
-    weights_target.mkdir(parents=True, exist_ok=True)
-    dataset_exists = dataset_target.exists() and any(dataset_target.iterdir())
+    detection_weights_target = WEIGHTS_DIR / "detection_weights"
+    detection_weights_target.mkdir(parents=True, exist_ok=True)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    dataset_exists = DATA_DIR.exists() and any(DATA_DIR.iterdir())
 
     if temp_dir.exists():
         shutil.rmtree(temp_dir)
@@ -29,25 +31,26 @@ def main():
     except Exception as e:
         print(f"Download error: {e}")
 
-    print("Synchronizing weights")
-    weight_exts = {'.pt', '.pth', '.onnx', '.engine'}
-    for f in temp_dir.rglob("*"):
-        if f.is_file() and f.suffix.lower() in weight_exts:
-            dst = weights_target / f.name
+    print("Synchronizing ONNX weights")
+    for f in temp_dir.rglob("*.onnx"):
+        if f.is_file():
+            dst = detection_weights_target / f.name
             if not dst.exists():
                 shutil.copy2(f, dst)
-                print(f"Added: {f.name}")
+                print(f"Added ONNX weight: {f.name}")
 
     if not dataset_exists:
-        zip_path = next(temp_dir.rglob("ceramic_dataset.zip"), None)
+        zip_path = next(temp_dir.rglob("*.zip"), None)
         if zip_path:
-            print("Extracting dataset")
+            print(f"Extracting dataset from {zip_path.name}")
             try:
                 with zipfile.ZipFile(zip_path, "r") as zf:
-                    zf.extractall(repo_root)
+                    zf.extractall(ROOT_DIR)
                 print("Dataset extracted")
             except Exception as e:
                 print(f"Extraction error: {e}")
+        else:
+            print("Dataset zip archive not found in downloaded artifacts")
     else:
         print("Dataset already exists, skipping extraction")
 

@@ -1,3 +1,0 @@
-Model,Timestamp,mAP50,mAP50-95,Precision,Recall,F1,Latency_ms,FPS,TP,Total_Pred,Total_GT
-yolo26s_without_neg,2026-10-23 16:44:05,0.8712,0.7152,0.6098,0.9804,0.7519,109.99,9.1,50,82,51
-yolo26s_with_neg,2026-10-23 16:44:21,0.9428,0.7942,0.7692,0.9804,0.8621,102.50,9.8,50,65,51
