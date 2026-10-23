@@ -107,7 +107,8 @@ def train(images_root, splits, output, epochs=None, batch_size=None, profile=Non
             run.log_metrics({"loss": loss_sum / len(train_ds), "lr": learning_rate,
                              **{name: total / len(train_ds) for name, total in loss_components.items()}}, epoch + 1, "train")
             run.log_metrics(metrics["coco"], epoch + 1, "val")
-            run.log_metrics({key: metrics["operating_point"][key] for key in ("precision", "recall", "f1")},
+            run.log_metrics({key: metrics["operating_point"][key]
+                             for key in ("precision", "recall", "f1", "negative_image_fpr")},
                             epoch + 1, "val_at_0.5")
             run.log_metrics({"seconds_train_and_val": history[-1]["seconds_train_and_val"]}, epoch + 1, "timing")
             if map_value is not None and map_value > best_map:

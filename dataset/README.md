@@ -94,7 +94,7 @@ TeamCocoDetection сохраняет этот формат; generic rtdetr-ко�
 
 ## Общие train и val
 
-В ветке pipeline разделение выполняется один раз по предметам с seed 42,
+В ветке pipeline положительные фото разделяются один раз по предметам с seed 42,
 а train и val читают разные сохранённые JSON. Внутри класса разбиения нет.
 Полная инструкция: [detection_pipeline/README.md](../detection_pipeline/README.md).
 
@@ -103,7 +103,7 @@ from detection_pipeline.datasets import make_datasets, make_loader
 
 train_ds, val_ds = make_datasets(
     images_root="/path/to/images",  # здесь находится stamps/
-    split_dir="detection_pipeline/splits/v1_seed42",
+    split_dir="detection_pipeline/splits/v2_seed42_neg50",
     profile="light",              # настоящие аугментации команды
 )
 train_loader = make_loader(train_ds, train=True, seed=42, batch_size=8)
@@ -117,6 +117,12 @@ CocoStampDataset здесь — адаптер над StampDataset, а не вт
 В RT-DETR используются тот же StampDataset и штатный postprocess; в MMDetection
 те же преобразования команды встроены в штатный CocoDataset.
 
-Проверенные негативы включайте в общий COCO до split. Передача одинаковых
-negative_dirs в уже разделённые train/val создаст пересечение. В val/test не
+Общий split v2_seed42_neg50 содержит 25 негативов из empty и 25 из
+ornaments_without_copies. Общие 50 фото случайно делятся на 40 train / 10 val
+с random_state=42, без квот по папкам в каждой части. В итоге train: 22/18, val: 3/7.
+Есть 8 пересечений предметов между положительными и отрицательными снимками
+в разных частях; список есть в manifest.negatives.group_overlap.
+Негативы записаны в COCO как images без annotations.
+Для нового отбора используйте detection_pipeline.data --base-splits и --negative-dirs.
+Передача одинаковых negative_dirs в уже разделённые train/val создаст пересечение. В val/test не
 должно быть случайных аугментаций. Независимого test в текущем 80/20 split нет.

@@ -19,6 +19,7 @@ def compare(paths, output):
                      **{k: result["coco"][k] for k in ("map_50_95", "ap50", "ap75")},
                      "precision_at_fixed_threshold": point["precision"],
                      "recall_at_fixed_threshold": point["recall"], "fixed_threshold": point["threshold"],
+                     "negative_image_fpr_at_fixed_threshold": point.get("negative_image_fpr"),
                      "target_precision_on_val": tuned.get("min_precision"),
                      "recall_at_target_precision_on_val": selected.get("recall"),
                      "selected_threshold_on_val": selected.get("threshold")})
