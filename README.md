@@ -7,6 +7,7 @@ RT-DETRv2-S и RTMDet-tiny/s. Построен поверх класса и ау
 Запуск и соединение частей описаны в [инструкции](detection_pipeline/README.md).
 Обучение RTMDet-s: [отдельный ноутбук](train_pipelines/detection_models/RTMDet-s/rtmdet_s_train.ipynb)
 и [локальная установка](train_pipelines/detection_models/RTMDet-s/README.md).
+Проверка RTMDet-s и галерея всех stamps: [тестовый ноутбук](test_pipelines/detection_models/RTMDet-s/rtmdet_s_test.ipynb).
 
 - Общий split: **train 243 фото / val 61 фото (40/10 негативов)**, seed **42**.
 - Каждая модель выбирает аугментации в [configs/experiments.json](configs/experiments.json).
