@@ -172,50 +172,68 @@ class TestDetectionDataset(Dataset):
     def _add_negatives(
         self, split: str | None, val_ratio: float, random_state: int
     ) -> None:
-        n_pos = len(self.items)
         known = {Path(item["file_name"]).name for item in self.items}
         next_id = max((item["image_id"] for item in self.items), default=0) + 1
 
-        paths = []
+        target_folders = []
         for folder in self.negative_dirs:
             if not folder.is_dir():
-                raise FileNotFoundError(
-                    f"Папка с негативами не найдена: {folder}"
-                )
-            paths.extend(
+                raise FileNotFoundError(f"Папка с негативами не найдена: {folder}")
+            subdirs = sorted([d for d in folder.iterdir() if d.is_dir()])
+            if subdirs:
+                target_folders.extend(subdirs)
+            else:
+                target_folders.append(folder)
+
+        if not target_folders:
+            return
+
+        all_chosen = []
+
+        for dir_idx, folder in enumerate(target_folders):
+            folder_seed = random_state + dir_idx * 1000
+
+            paths = [
                 p
                 for p in folder.rglob("*")
                 if p.is_file() and p.suffix.lower() == ".png"
-            )
+            ]
+            paths.sort(key=lambda p: unicodedata.normalize("NFC", str(p)))
 
-        paths.sort(key=lambda p: unicodedata.normalize("NFC", str(p)))
-        chosen = []
-        for path in paths:
-            name = unicodedata.normalize("NFC", path.name)
-            if name in known:
-                continue
-            known.add(name)
-            chosen.append(path)
+            unique_paths = []
+            for path in paths:
+                name = unicodedata.normalize("NFC", path.name)
+                if name in known:
+                    continue
+                known.add(name)
+                unique_paths.append(path)
 
-        if split in ("train", "val") and 0.0 < val_ratio < 1.0:
-            indices = list(range(len(chosen)))
-            random.Random(random_state).shuffle(indices)
+            rng = random.Random(folder_seed)
+            indices = list(range(len(unique_paths)))
+            rng.shuffle(indices)
 
-            n_val = max(1, round(len(chosen) * val_ratio))
+            n_val = max(1, round(len(unique_paths) * val_ratio))
             val_indices = set(indices[:n_val])
 
             if split == "val":
-                chosen = [chosen[i] for i in sorted(val_indices)]
-            else:
+                selected = [unique_paths[i] for i in sorted(val_indices)]
+            elif split == "train":
                 train_indices = set(indices[n_val:])
-                chosen = [chosen[i] for i in sorted(train_indices)]
+                train_pool = [unique_paths[i] for i in sorted(train_indices)]
+                
+                if self.negative_ratio is not None and train_pool:
+                    n_take = max(1, round(len(train_pool) * self.negative_ratio))
+                    sample_rng = random.Random(folder_seed + 1)
+                    sample_rng.shuffle(train_pool)
+                    selected = train_pool[:n_take]
+                else:
+                    selected = train_pool
+            else:
+                selected = unique_paths
 
-        if self.negative_ratio is not None and chosen:
-            limit = round(n_pos * self.negative_ratio)
-            random.Random(random_state).shuffle(chosen)
-            chosen = chosen[:limit]
+            all_chosen.extend(selected)
 
-        for path in chosen:
+        for path in all_chosen:
             name = unicodedata.normalize("NFC", path.name)
             cipher, shot = self._cipher_and_shot(name)
             with Image.open(path) as img:

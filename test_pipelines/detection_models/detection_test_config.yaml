@@ -19,7 +19,7 @@ models:
     imgsz: 640
 
   - name: "yolo26s_with_neg"
-    type: "onnx"~
+    type: "onnx"
     process_file: "test_pipelines/detection_models/detection_configs/yolo_processing.py"
     process_class: "YOLOProcessing"
     weights_path: "train_pipelines/detection_models/detection_model_weights/ceramic_yolo26s_with_neg.onnx"

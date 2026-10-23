@@ -295,9 +295,13 @@ def main():
 
     negative_dirs = []
     if dataset_cfg.get("negatives_dir"):
-        neg_path = Path(dataset_cfg["negatives_dir"])
-        if neg_path.is_dir():
-            negative_dirs.append(neg_path)
+        neg_base = Path(dataset_cfg["negatives_dir"])
+        for sub_name in ["empty", "ornaments"]:
+            target_sub = neg_base / sub_name
+            if target_sub.is_dir():
+                negative_dirs.append(target_sub)
+            else:
+                raise FileNotFoundError(f"Не найдена папка с негативами: {target_sub}")
 
     dataset = TestDetectionDataset(
         images_dir=images_dir,
