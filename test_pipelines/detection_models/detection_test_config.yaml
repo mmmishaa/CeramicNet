@@ -7,20 +7,20 @@ dataset:
   val: 0.2
 
 confidence_config:
-  conf_threshold: 0.25
+  conf_threshold: 0.75
   iou_threshold: 0.5
 
 models:
-  - name: "yolo26s_without_neg"
+  - name: "yolo26s_v1"
     type: "onnx"
     process_file: "test_pipelines/detection_models/detection_configs/yolo_processing.py"
     process_class: "YOLOProcessing"
-    weights_path: "train_pipelines/detection_models/detection_model_weights/ceramic_yolo26s_without_neg.onnx"
+    weights_path: "train_pipelines/detection_models/detection_model_weights/yolo26s_v1.onnx"
     imgsz: 640
 
-  - name: "yolo26s_with_neg"
+  - name: "yolo26s_v2"
     type: "onnx"
     process_file: "test_pipelines/detection_models/detection_configs/yolo_processing.py"
     process_class: "YOLOProcessing"
-    weights_path: "train_pipelines/detection_models/detection_model_weights/ceramic_yolo26s_with_neg.onnx"
+    weights_path: "train_pipelines/detection_models/detection_model_weights/yolo26s_v2.onnx"
     imgsz: 640

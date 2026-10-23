@@ -172,6 +172,7 @@ class TestDetectionDataset(Dataset):
     def _add_negatives(
         self, split: str | None, val_ratio: float, random_state: int
     ) -> None:
+        n_pos = len(self.items)
         known = {Path(item["file_name"]).name for item in self.items}
         next_id = max((item["image_id"] for item in self.items), default=0) + 1
 
@@ -189,6 +190,11 @@ class TestDetectionDataset(Dataset):
             return
 
         all_chosen = []
+
+        val_negative_ratio = 0.50
+        quota_per_val_folder = max(
+            1, round((n_pos * val_negative_ratio) / len(target_folders))
+        )
 
         for dir_idx, folder in enumerate(target_folders):
             folder_seed = random_state + dir_idx * 1000
@@ -216,7 +222,13 @@ class TestDetectionDataset(Dataset):
             val_indices = set(indices[:n_val])
 
             if split == "val":
-                selected = [unique_paths[i] for i in sorted(val_indices)]
+                val_pool = [unique_paths[i] for i in sorted(val_indices)]
+                
+                # Отбираем детерминированно квоту (50% от позитивов / количество папок)
+                sample_rng = random.Random(folder_seed + 2)
+                sample_rng.shuffle(val_pool)
+                selected = val_pool[:quota_per_val_folder]
+
             elif split == "train":
                 train_indices = set(indices[n_val:])
                 train_pool = [unique_paths[i] for i in sorted(train_indices)]
