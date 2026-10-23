@@ -45,7 +45,7 @@ ClearML offline-folder записывается в tracking/run.json. После
 
 ```bash
 python -m detection_pipeline.train_fasterrcnn \
-  --images "$CERAMIC_IMAGES" --splits detection_pipeline/splits/v2_seed42_neg50 \
+  --images "$CERAMIC_IMAGES" --splits detection_pipeline/splits/v3_seed42_reserve80_active15 \
   --output runs/fasterrcnn_light_clearml --tracking clearml \
   --run-name fasterrcnn-light-seed42
 

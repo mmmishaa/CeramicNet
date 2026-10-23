@@ -26,12 +26,13 @@ COCO evaluator, set_epoch и collate, а чтение изображений/р�
 
 | Часть | Фото всего | Положительные | Негативы | Рамки | Предметы |
 |---|---:|---:|---:|---:|---:|
-| train | 243 | 203 | 40 | 205 | 226 |
-| val | 61 | 51 | 10 | 52 | 60 |
+| train | 259 | 203 | 56 | 205 | 241 |
+| val | 145 | 51 | 94 | 52 | 137 |
 
-Текущие файлы: `detection_pipeline/splits/v2_seed42_neg50/{train,val,manifest}.json`.
+Текущие файлы: `detection_pipeline/splits/v3_seed42_reserve80_active15/{train,val,manifest}.json`.
 Первоначальный split только с положительными фото сохранён в `splits/v1_seed42`.
-В v2 положительные фото, их части и разметка сохранены; добавлены 50 негативов.
+В v3 положительные фото, их части и разметка сохранены. Старый split
+с 50 негативами находится в splits/v2_seed42_neg50; текущий протокол другой.
 
 Положительные фото: seed 42, примерно 80/20 по предметам. Последний суффикс `_номер_снимка` отбрасывается,
 снимки одного предмета остаются вместе. Точные копии объединяются по SHA256.
@@ -64,46 +65,66 @@ python -m detection_pipeline.data --annotations /path/instances_default.json \
   --images "$CERAMIC_IMAGES" --output detection_pipeline/splits/v2_seed42
 ```
 
-Источники негативов — локальные папки `empty` (254 фото) и
-`ornaments_without_copies` (214 фото). Из каждой папки случайно выбираются
-**25 фото**, после чего объединённые **50 фото** случайно делятся на **40 train
-и 10 val**. Квот по источникам внутри train/val нет. Все этапы используют
-`random_state=42`: для каждого источника сортируются пути, берутся первые 25
-индексов NumPy RandomState(42).permutation, списки объединяются в порядке
-empty, ornaments_without_copies, затем новая перестановка RandomState(42)
-отправляет первые 10 индексов в val, остальные 40 в train. Последний этап
-соответствует индексам train_test_split(test_size=0.2, random_state=42).
-Точные копии и кадры исходного split исключаются перед отбором.
+Источники негативов — локальные папки `empty` (254 фото, очищенная по
+подтверждению пользователя) и `ornaments_without_copies` (214 фото).
+Точные копии по SHA256 и изображения исходного split исключаются до отбора.
+Каждый источник отдельно случайно разделяется с seed 42 на **80% обучающего
+резерва / 20% val**. Затем из **объединённого резерва** случайно выбираются
+**15% для фактического train**. Оставшиеся кадры резерва не участвуют ни в
+обучении, ни в оценке. Val использует все отложенные 20%, а не 20% активной выборки.
+Квот по источникам внутри активного train нет.
 
-Результат: train — **22 empty + 18 ornaments**; val — **3 empty + 7 ornaments**.
-Полный список выбранных файлов и SHA256 сохранён в manifest.json.
-При таком разделении по фото **8 предметов представлены в обеих частях**:
-негативным снимком в одной и положительным в другой. Между самими негативами
-пересечений по предметам нет. Поля group_overlap и negative_group_overlap
-в manifest явно фиксируют эти проверки. Это случайное разделение по фото;
-его результаты не являются проверкой обобщения на полностью новые предметы.
+| Источник | Всего | Обучающий резерв | Фактический train | Не используются | Val |
+|---|---:|---:|---:|---:|---:|
+| empty | 254 | 203 | 34 | 169 | 51 |
+| ornaments_without_copies | 214 | 171 | 22 | 149 | 43 |
+| Всего | 468 | 374 | 56 | 318 | 94 |
 
-В COCO у негативов есть images и нет annotations; отдельный класс «фон» не создаётся.
-Один сохранённый набор используется всеми моделями и включается в хеш split ClearML.
+Для каждого источника пути сортируются и перемешиваются NumPy RandomState(42).
+Размер резерва — floor(N * 0.8), остальные кадры образуют val (ceil(N * 0.2)).
+Резервы объединяются в порядке отсортированных источников; отдельная
+перестановка RandomState(42) выбирает первые floor(374 * 0.15) = 56 кадров.
+Остальные 318 закреплены за резервом и в val не перемещаются.
 
-Воспроизвести подготовку в **новую** папку (существующий split не перезаписывается):
+`train.json` и `val.json` — единственные файлы, которые читают загрузчики моделей.
+`negative_train_reserve.json` содержит все 374 потенциально обучающих негатива;
+`negative_unused.json` — 318 пока неиспользуемых кадров. Manifest хранит параметры,
+количества, выбранные кадры и SHA256 дополнительных файлов. Самих фото в Git нет.
+В COCO негативы представлены images без annotations; отдельного класса фона нет.
+
+При увеличении --negative-active-fraction с тем же seed, источниками и их
+содержимым резерв и val.json сохраняются побайтно, включая image_id.
+Активный train расширяется внутри существующего резерва. Для другой доли
+создайте новую папку split и сохраните её manifest. Изменение источников, seed
+или доли резерва создаёт уже другой протокол.
+
+Обучающий резерв и val **не пересекаются по файлам, SHA256 и image_id**.
+Разделение по кадрам не запрещает разные снимки одного предмета в разных частях:
+сейчас 41 предмет пересекает фактические train/val, из них 8 представлены
+негативами в обеих частях; между всем резервом и негативным val — 37 предметов.
+Списки group_overlap, negative_group_overlap и reserve_val_group_overlap
+записаны в manifest. Это ограничение оценки на новых предметах.
+
+Воспроизвести подготовку в новую папку:
 
 ```bash
 python -m detection_pipeline.data \
   --base-splits detection_pipeline/splits/v1_seed42 \
   --images "$CERAMIC_IMAGES" \
   --negative-dirs "$CERAMIC_IMAGES/empty" "$CERAMIC_IMAGES/ornaments_without_copies" \
-  --negative-per-dir 25 --negative-train 40 --negative-val 10 --seed 42 \
-  --output detection_pipeline/splits/v2_seed42_neg50_reproduced
+  --negative-reserve-fraction 0.8 --negative-active-fraction 0.15 --seed 42 \
+  --output detection_pipeline/splits/v3_seed42_reserve80_active15_reproduced
 ```
 
-Папка негативов должна находиться внутри общего корня изображений. Подготовка
-проверяет SHA256 исходных фото, размеры негативов и наличие нужного числа файлов;
-пересечения предметов записывает в manifest; при нехватке не создаёт неполный split. Фотографии не копируются.
-Не добавляйте negative_dirs отдельно в каждом Dataset после разделения.
-Общий оценщик считает negative_image_fpr — долю негативных фото с хотя бы одним
-ложным обнаружением при заданном пороге. В Faster R-CNN этот график пишется в
-ClearML вместе с precision/recall; сравнение CSV тоже включает эту метрику.
+Папки негативов должны находиться внутри общего корня изображений.
+Существующие split не перезаписываются. При некорректных долях, пустом
+резерве или доле обучения, дающей ноль кадров, новый split не создаётся.
+Все модели используют один и тот же сохранённый протокол. В ClearML/local
+identity включены train, val, manifest и оба файла резерва; это только
+артефакты логирования, а не дополнительные обучающие/валидационные примеры.
+Оценщик считает negative_image_fpr — долю отрицательных фото с хотя бы одним
+ложным обнаружением. Faster R-CNN пишет этот график в ClearML; сравнительный
+CSV тоже включает эту метрику.
 
 Новый параметр StampDataset.negative_ratio поддерживается для отдельной подготовки
 данных. negative_seed=42 задаёт воспроизводимый отбор (0 — старый seed datasets).
@@ -167,7 +188,7 @@ RT-DETR и MMDetection устанавливайте их зависимости 
 ```bash
 python -m pip install -r detection_pipeline/requirements.txt
 python -m detection_pipeline.train_fasterrcnn \
-  --images "$CERAMIC_IMAGES" --splits detection_pipeline/splits/v2_seed42_neg50 \
+  --images "$CERAMIC_IMAGES" --splits detection_pipeline/splits/v3_seed42_reserve80_active15 \
   --output runs/fasterrcnn_light_seed42
 ```
 
@@ -179,7 +200,7 @@ Faster R-CNN загружает COCO weights, использует AdamW и со
 
 ```bash
 python -m detection_pipeline.native_configs \
-  --images "$CERAMIC_IMAGES" --splits detection_pipeline/splits/v2_seed42_neg50 \
+  --images "$CERAMIC_IMAGES" --splits detection_pipeline/splits/v3_seed42_reserve80_active15 \
   --output runs/configs \
   --rtdetr-repo /absolute/path/RT-DETR --mmdet-repo /absolute/path/mmdetection
 ```
@@ -237,12 +258,12 @@ Faster R-CNN передаёт loss/компоненты, lr и общие valida
 ```bash
 python -m detection_pipeline.predict_native rtdetr --repo /absolute/path/RT-DETR \
   --config runs/configs/rtdetrv2_s_light.yml --checkpoint /path/best.pth \
-  --images "$CERAMIC_IMAGES" --annotations detection_pipeline/splits/v2_seed42_neg50/val.json \
+  --images "$CERAMIC_IMAGES" --annotations detection_pipeline/splits/v3_seed42_reserve80_active15/val.json \
   --output runs/rtdetr_val --tune-threshold
 
 python -m detection_pipeline.predict_native mmdet --repo /absolute/path/mmdetection \
   --config runs/configs/rtmdet_tiny_light.py --checkpoint /path/best.pth \
-  --images "$CERAMIC_IMAGES" --annotations detection_pipeline/splits/v2_seed42_neg50/val.json \
+  --images "$CERAMIC_IMAGES" --annotations detection_pipeline/splits/v3_seed42_reserve80_active15/val.json \
   --output runs/rtmdet_val --tune-threshold
 ```
 
@@ -263,7 +284,7 @@ save_predictions. Старый YOLO нужно переобучить/оцени
 максимальный recall при precision>=90% (пример требования). Если условие не
 достигается, selected=null. Confidence не является гарантированной вероятностью
 правильной локализации; для такой интерпретации нужна отдельная калибровка.
-В val 51 положительное и 10 отрицательных фото; небольшая разница mAP будет шумной.
+В val 51 положительное и 94 отрицательных фото; небольшая разница mAP будет шумной.
 
 ```bash
 python -m detection_pipeline.compare runs/fasterrcnn_light_seed42/best_val_metrics.json \

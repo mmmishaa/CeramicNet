@@ -103,7 +103,7 @@ from detection_pipeline.datasets import make_datasets, make_loader
 
 train_ds, val_ds = make_datasets(
     images_root="/path/to/images",  # здесь находится stamps/
-    split_dir="detection_pipeline/splits/v2_seed42_neg50",
+    split_dir="detection_pipeline/splits/v3_seed42_reserve80_active15",
     profile="light",              # настоящие аугментации команды
 )
 train_loader = make_loader(train_ds, train=True, seed=42, batch_size=8)
@@ -117,12 +117,18 @@ CocoStampDataset здесь — адаптер над StampDataset, а не вт
 В RT-DETR используются тот же StampDataset и штатный postprocess; в MMDetection
 те же преобразования команды встроены в штатный CocoDataset.
 
-Общий split v2_seed42_neg50 содержит 25 негативов из empty и 25 из
-ornaments_without_copies. Общие 50 фото случайно делятся на 40 train / 10 val
-с random_state=42, без квот по папкам в каждой части. В итоге train: 22/18, val: 3/7.
-Есть 8 пересечений предметов между положительными и отрицательными снимками
-в разных частях; список есть в manifest.negatives.group_overlap.
-Негативы записаны в COCO как images без annotations.
-Для нового отбора используйте detection_pipeline.data --base-splits и --negative-dirs.
+Текущий split v3_seed42_reserve80_active15 использует резервирование негативов:
+из каждой папки empty/ornaments_without_copies 80% закреплены за обучающим
+резервом, 20% — за val. Из общего резерва 374 кадров в фактический train выбраны
+15% (56), остальные 318 не участвуют в обучении и оценке. В val 94 негатива.
+negative_train_reserve.json хранит весь резерв, negative_unused.json — неиспользованную
+часть. Dataset читает только train.json/val.json: резерв автоматически не добавляется.
+При увеличении доли обучения внутри этого резерва val остаётся неизменной.
+Всё воспроизводится с seed 42; файлы резерва и val не пересекаются по путям и SHA256.
+Разные фото одного предмета могут пересекаться между частями: manifest.negatives
+содержит group_overlap, negative_group_overlap и reserve_val_group_overlap.
+Негативы записаны в COCO как images без annotations. Для нового разбиения:
+detection_pipeline.data --base-splits с --negative-reserve-fraction 0.8
+и --negative-active-fraction 0.15; источники передаются через --negative-dirs.
 Передача одинаковых negative_dirs в уже разделённые train/val создаст пересечение. В val/test не
 должно быть случайных аугментаций. Независимого test в текущем 80/20 split нет.

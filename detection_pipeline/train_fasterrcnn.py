@@ -11,7 +11,7 @@ from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2, FasterRCNN_
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 from .adapters import torchvision_prediction
-from .data import read_json, write_json
+from .data import read_json, tracking_split_files, write_json
 from .datasets import make_datasets, make_loader, seed_everything
 from .evaluate import evaluate, save_predictions
 from .experiments import DEFAULT_EXPERIMENTS, resolve_augmentation
@@ -72,7 +72,7 @@ def train(images_root, splits, output, epochs=None, batch_size=None, profile=Non
               "split_manifest": read_json(splits / "manifest.json")}
     write_json(output / "config.json", config)
     with ExperimentRun("detection", run_name or output.name, output, config,
-                       {"train": splits / "train.json", "val": splits / "val.json"},
+                       tracking_split_files(splits / "train.json", splits / "val.json"),
                        mode=tracking, project=tracking_project, tags=[config["model"], profile]) as run:
         best_map, history = -1, []
         for epoch in range(epochs):

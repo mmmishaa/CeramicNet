@@ -152,7 +152,8 @@ def prepare_split(annotations, images_root, output, seed=42, val_fraction=0.2):
 
 
 def add_negative_split(base_splits, images_root, negative_dirs, output,
-                       seed=42, train_count=40, val_count=10, per_dir_count=None):
+                       seed=42, train_count=40, val_count=10, per_dir_count=None,
+                       reserve_train_fraction=None, active_train_fraction=0.15):
     """Add fixed counts of verified negatives, keeping the existing split intact.
 
     Paths must be inside images_root. Sampling uses NumPy RandomState(seed) over
@@ -160,7 +161,10 @@ def add_negative_split(base_splits, images_root, negative_dirs, output,
     objects already present among positives. per_dir_count first samples that
     many files from each directory, then randomly splits the combined sample
     by image, without group constraints. Group overlaps are recorded explicitly.
-    Exact copies are excluded before sampling in both modes.
+    reserve_train_fraction partitions each source into training reserve and val.
+    Only active_train_fraction of the combined reserve goes to train; the rest
+    is saved separately and never enters train/val loaders. Exact copies are
+    excluded before sampling in every mode.
     """
     import numpy as np
     from PIL import Image
@@ -171,6 +175,13 @@ def add_negative_split(base_splits, images_root, negative_dirs, output,
     if per_dir_count is not None and (isinstance(per_dir_count, bool)
                                      or not isinstance(per_dir_count, int) or per_dir_count <= 0):
         raise ValueError("per_dir_count must be a positive integer")
+    if reserve_train_fraction is not None:
+        if per_dir_count is not None:
+            raise ValueError("Choose either per_dir_count or reserve_train_fraction")
+        if not math.isfinite(reserve_train_fraction) or not 0 < reserve_train_fraction < 1:
+            raise ValueError("reserve_train_fraction must be between 0 and 1")
+        if not math.isfinite(active_train_fraction) or not 0 < active_train_fraction <= 1:
+            raise ValueError("active_train_fraction must be between 0 and 1 inclusive")
     root, base, output = (Path(p).resolve() for p in (images_root, base_splits, output))
     if output.exists():
         raise FileExistsError(f"Split already exists: {output}. Choose a new version directory.")
@@ -231,7 +242,67 @@ def add_negative_split(base_splits, images_root, negative_dirs, output,
 
     candidate_fingerprint = hashlib.sha256(json.dumps(
         candidates, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
-    if per_dir_count is not None:
+    auxiliary, reservation = {}, {}
+    if reserve_train_fraction is not None:
+        # IDs depend on the full pool, so changing the active training fraction
+        # preserves validation IDs and its entire COCO file byte-for-byte.
+        for index, im in enumerate(candidates, max(known_ids) + 1):
+            im["id"] = index
+        reserve, validation, assigned_paths = [], [], set()
+        source_counts = {}
+        for folder in sorted(folders):
+            pool = [im for im in candidates
+                    if Path(im["file_name"]).is_relative_to(Path(folder))]
+            if len(pool) < 2:
+                raise ValueError(f"Need at least two eligible negatives in {folder}. No split was written.")
+            if any(im["file_name"] in assigned_paths for im in pool):
+                raise ValueError("Negative directories overlap; use separate source directories")
+            assigned_paths.update(im["file_name"] for im in pool)
+            n_val = len(pool) - math.floor(len(pool) * reserve_train_fraction)
+            if n_val >= len(pool):
+                raise ValueError(f"No images remain in the training reserve for {folder}")
+            permutation = np.random.RandomState(seed).permutation(len(pool))
+            held_out = [pool[int(i)] for i in permutation[:n_val]]
+            potential_train = [pool[int(i)] for i in permutation[n_val:]]
+            validation.extend(held_out)
+            reserve.extend(potential_train)
+            source_counts[folder] = {"candidates": len(pool), "train_reserve": len(potential_train),
+                                     "val": len(held_out)}
+        if not reserve:
+            raise ValueError("Training reserve is empty. No split was written.")
+        n_active = math.floor(len(reserve) * active_train_fraction)
+        if n_active == 0:
+            raise ValueError("Training fraction selects zero images. No split was written.")
+        indices = np.random.RandomState(seed).permutation(len(reserve))
+        active = [reserve[int(i)] for i in indices[:n_active]]
+        inactive = [reserve[int(i)] for i in indices[n_active:]]
+        selected = {"train": active, "val": validation}
+        for folder, counts in source_counts.items():
+            counts["train"] = sum(Path(im["file_name"]).is_relative_to(Path(folder)) for im in active)
+            counts["unused"] = counts["train_reserve"] - counts["train"]
+        for name, records, description in (
+            ("negative_train_reserve.json", reserve, "Potential training negatives; never validation"),
+            ("negative_unused.json", inactive, "Reserved negatives not used by current train/val loaders"),
+        ):
+            auxiliary[name] = {"info": {"description": description}, "images": records,
+                               "annotations": [], "categories": deepcopy(subsets["train"]["categories"])}
+        reservation = {
+            "reserve_train_fraction": reserve_train_fraction,
+            "active_train_fraction": active_train_fraction,
+            "active_fraction_of": "combined_negative_training_reserve",
+            "rounding": "validation: ceil per source; active train: floor of combined reserve",
+            "source_counts": source_counts,
+            "counts": {"train": len(active), "val": len(validation),
+                       "train_reserve": len(reserve), "unused": len(inactive)},
+            "reserve_files": {name: {"images": len(payload["images"]),
+                                      "sha256": hashlib.sha256((json.dumps(payload, ensure_ascii=False,
+                                                                           indent=2) + "\n").encode()).hexdigest()}
+                              for name, payload in auxiliary.items()},
+            "reserve_val_group_overlap": sorted({object_id(im) for im in reserve} &
+                                                 {object_id(im) for im in validation}),
+        }
+        sampling = "sorted paths; per-source reserve/val RandomState(seed); active subset of combined reserve RandomState(seed)"
+    elif per_dir_count is not None:
         if len(folders) * per_dir_count != train_count + val_count:
             raise ValueError("per_dir_count * number of directories must equal train_count + val_count")
         sample, assigned_paths = [], set()
@@ -274,8 +345,9 @@ def add_negative_split(base_splits, images_root, negative_dirs, output,
     next_id, stats = max(known_ids) + 1, {}
     for split, subset in subsets.items():
         for im in selected[split]:
-            im["id"] = next_id
-            next_id += 1
+            if reserve_train_fraction is None:
+                im["id"] = next_id
+                next_id += 1
         subset["images"].extend(selected[split])
         validate_coco(subset)
         stats[split] = {"images": len(subset["images"]), "boxes": len(subset["annotations"]),
@@ -292,21 +364,36 @@ def add_negative_split(base_splits, images_root, negative_dirs, output,
                     stats=stats,
                     negatives={"directories": sorted(folders), "random_state": seed,
                                "sampling": sampling, "per_directory_count": per_dir_count,
-                               "split_by": "image" if per_dir_count is not None else "object",
+                               "split_by": "image" if per_dir_count is not None or reserve_train_fraction is not None else "object",
                                "group_overlap": sorted(groups["train"] & groups["val"]),
                                "negative_group_overlap": sorted(negative_groups["train"] & negative_groups["val"]),
                                "candidate_count": len(candidates), "skipped": dict(skipped),
                                "candidate_sha256": candidate_fingerprint,
                                "counts": {"train": train_count, "val": val_count},
-                               "selected": {s: [dict(im) for im in chosen] for s, chosen in selected.items()}})
+                               "selected": {s: [dict(im) for im in chosen] for s, chosen in selected.items()},
+                               **reservation})
     manifest["fingerprint"] = hashlib.sha256(json.dumps(
         {"data": subsets, "base": base_hashes, "negatives": manifest["negatives"]},
         sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     output.mkdir(parents=True)
     for split, subset in subsets.items():
         write_json(output / f"{split}.json", subset)
+    for name, payload in auxiliary.items():
+        write_json(output / name, payload)
     write_json(output / "manifest.json", manifest)
     return manifest
+
+
+def tracking_split_files(train_file, val_file):
+    """Include saved reservation protocol in run identity, never in loaders."""
+    train_file, val_file = Path(train_file), Path(val_file)
+    files = {"train": train_file, "val": val_file}
+    if train_file.parent == val_file.parent and (train_file.name, val_file.name) == ("train.json", "val.json"):
+        for name in ("manifest.json", "negative_train_reserve.json", "negative_unused.json"):
+            path = train_file.parent / name
+            if path.is_file():
+                files[path.stem] = path
+    return files
 
 
 if __name__ == "__main__":
@@ -320,15 +407,22 @@ if __name__ == "__main__":
     parser.add_argument("--negative-dirs", nargs="+", help="Verified negatives, inside --images")
     parser.add_argument("--negative-train", type=int, default=40)
     parser.add_argument("--negative-val", type=int, default=10)
-    parser.add_argument("--negative-per-dir", type=int,
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--negative-per-dir", type=int,
                         help="Sample this many files per source, then randomly split combined images")
+    mode.add_argument("--negative-reserve-fraction", type=float,
+                      help="Reserve this fraction of each source for potential training; remainder is val")
+    parser.add_argument("--negative-active-fraction", type=float, default=0.15,
+                        help="Use this fraction of the combined negative training reserve")
     args = parser.parse_args()
     if args.base_splits:
         if not args.negative_dirs:
             parser.error("--base-splits requires --negative-dirs")
         manifest = add_negative_split(args.base_splits, args.images, args.negative_dirs,
                                       args.output, args.seed, args.negative_train, args.negative_val,
-                                      per_dir_count=args.negative_per_dir)
+                                      per_dir_count=args.negative_per_dir,
+                                      reserve_train_fraction=args.negative_reserve_fraction,
+                                      active_train_fraction=args.negative_active_fraction)
     else:
         if args.negative_dirs:
             parser.error("--negative-dirs requires --base-splits")

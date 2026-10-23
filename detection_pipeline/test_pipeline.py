@@ -6,7 +6,7 @@ import unittest
 from PIL import Image
 
 from .adapters import xyxy_to_coco
-from .data import add_negative_split, prepare_split, read_json, write_json
+from .data import add_negative_split, prepare_split, read_json, tracking_split_files, write_json
 from .evaluate import (annotations_digest, coco_metrics, operating_metrics,
                        select_threshold, validate_predictions)
 
@@ -25,6 +25,69 @@ def artifact(data, detections):
 
 
 class ProtocolTests(unittest.TestCase):
+    def test_training_reserve_never_enters_val_and_active_fraction_preserves_val(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = fixture_data()
+            data["annotations"].append(dict(data["annotations"][0], id=2, image_id=2))
+            for im in data["images"]:
+                Image.new("RGB", (64, 32), (im["id"], 0, 0)).save(root / im["file_name"])
+            write_json(root / "input.json", data)
+            prepare_split(root / "input.json", root, root / "base")
+            folders = [root / "empty", root / "ornaments_without_copies"]
+            for n, folder in enumerate(folders):
+                folder.mkdir()
+                for i in range(100):
+                    Image.new("RGB", (64, 32), (i, 100 + n, 0)).save(folder / f"negative{i:03}_1.png")
+            a = add_negative_split(root / "base", root, folders, root / "new",
+                                   reserve_train_fraction=0.8, active_train_fraction=0.15)
+            b = add_negative_split(root / "base", root, folders[::-1], root / "repeat",
+                                   reserve_train_fraction=0.8, active_train_fraction=0.15)
+            self.assertEqual(a, b)
+            counts = a["negatives"]["counts"]
+            self.assertEqual(counts, {"train": 24, "val": 40, "train_reserve": 160, "unused": 136})
+            for source in a["negatives"]["source_counts"].values():
+                self.assertEqual((source["train_reserve"], source["val"]), (80, 20))
+            reserve = read_json(root / "new/negative_train_reserve.json")
+            unused = read_json(root / "new/negative_unused.json")
+            chosen = a["negatives"]["selected"]
+            for key in ("id", "sha256", "file_name"):
+                reserved = {im[key] for im in reserve["images"]}
+                active = {im[key] for im in chosen["train"]}
+                ignored = {im[key] for im in unused["images"]}
+                validation = {im[key] for im in chosen["val"]}
+                self.assertEqual(reserved, active | ignored)
+                self.assertFalse(active & ignored)
+                self.assertFalse(reserved & validation)
+            for name, record in a["negatives"]["reserve_files"].items():
+                self.assertEqual(hashlib.sha256((root / "new" / name).read_bytes()).hexdigest(), record["sha256"])
+            c = add_negative_split(root / "base", root, folders, root / "more_train",
+                                   reserve_train_fraction=0.8, active_train_fraction=0.3)
+            self.assertEqual((root / "new/val.json").read_bytes(), (root / "more_train/val.json").read_bytes())
+            self.assertEqual((root / "new/negative_train_reserve.json").read_bytes(),
+                             (root / "more_train/negative_train_reserve.json").read_bytes())
+            self.assertEqual(c["negatives"]["counts"]["train"], 48)
+            self.assertTrue({im["id"] for im in chosen["train"]} <=
+                            {im["id"] for im in c["negatives"]["selected"]["train"]})
+            # Only active negatives appear in the actual COCO training file.
+            train = read_json(root / "new/train.json")
+            original = read_json(root / "base/train.json")
+            self.assertEqual(len(train["images"]), len(original["images"]) + 24)
+            self.assertEqual(train["annotations"], original["annotations"])
+            files = tracking_split_files(root / "new/train.json", root / "new/val.json")
+            self.assertEqual(set(files), {"train", "val", "manifest", "negative_train_reserve", "negative_unused"})
+
+    def test_reserve_mode_rejects_invalid_fractions_without_writing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for fraction, active in ((0, 0.15), (1, 0.15), (float("nan"), 0.15),
+                                     (0.8, 0), (0.8, 1.1)):
+                with self.assertRaises(ValueError):
+                    add_negative_split(root / "base", root, [], root / "new",
+                                       reserve_train_fraction=fraction, active_train_fraction=active)
+                self.assertFalse((root / "new").exists())
+
     def test_25_per_source_then_random_split_without_source_or_group_quotas(self):
         from collections import Counter
         with tempfile.TemporaryDirectory() as directory:

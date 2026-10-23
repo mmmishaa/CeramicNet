@@ -8,7 +8,7 @@ import sys
 
 from experiment_tracking import ExperimentRun
 from experiment_tracking.native_logs import NativeLogForwarder
-from .data import read_json
+from .data import read_json, tracking_split_files
 
 
 def tracking_configuration(framework, config, extra, native_root):
@@ -56,6 +56,7 @@ def tracking_configuration(framework, config, extra, native_root):
         if not path.is_absolute() and dataset.get("data_root"):
             path = Path(dataset["data_root"]) / path
         splits[name] = absolute(path)
+    splits = tracking_split_files(splits["train"], splits["val"])
     metadata_path = config.with_suffix(".metadata.json")
     metadata = read_json(metadata_path) if metadata_path.is_file() else {}
     parameters = {**metadata, "framework": framework, "native_config": resolved, "native_arguments": list(extra)}
