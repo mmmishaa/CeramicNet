@@ -60,6 +60,41 @@ torch используется `-Wno-error=invalid-specialization`.
 По умолчанию используется локальный логгер; ClearML включается параметром
 `TRACKING="clearml"` после установки `requirements-tracking.txt` и `clearml-init`.
 
+### ONNX
+
+После обучения ноутбук автоматически экспортирует лучший checkpoint в
+`onnx/rtmdet_s_best.onnx` (opset 17, стандартные ONNX-операторы, batch 1, 640×640).
+`.pth` сохраняется для возобновления обучения. Для передачи модели используйте
+`.onnx` вместе с обработчиком
+[`RTMDetProcessing`](../../../detection_pipeline/rtmdet_onnx_processing.py).
+Он реализует `preprocess`/`postprocess` общего тестового пайплайна:
+`processor_module: detection_pipeline.rtmdet_onnx_processing`,
+`process_class: RTMDetProcessing`, `imgsz: 640`.
+Обработчик YOLO не подходит: RTMDet использует BGR, другой resize/pad,
+нормализацию и формат рамок. Для инференса достаточно `onnxruntime`, NumPy и OpenCV;
+MMDetection и MMCV нужны только для обучения/экспорта.
+
+Повторный экспорт существующего опыта (без обучения):
+
+```bash
+.venv-rtmdet/bin/python train_pipelines/detection_models/RTMDet-s/export_onnx.py \
+  --config runs/<run>/configs/rtmdet_s.py \
+  --checkpoint runs/<run>/train/best_coco_bbox_mAP_epoch_49.pth \
+  --output runs/<run>/onnx/rtmdet_s_best.onnx
+```
+
+Вход ONNX: BGR float32 `[1,3,640,640]`, значения 0–255; нормализация внутри графа.
+Выход: `[1,8400,5]`, xyxy в пикселях входа + вероятность клейма.
+NMS и восстановление исходных координат выполняет обработчик. Параметры исходной
+оценки: NMS IoU 0.65, confidence 0.001 для COCO AP; рабочий confidence 0.84
+выбран на val. Порог NMS и IoU сопоставления с разметкой — разные параметры.
+Текущий общий бенчмарк может передавать один `iou_threshold` в оба места;
+для воспроизведения COCO-метрик используйте сохранённый v3 val и общий оценщик.
+
+`validate_onnx.py` проверяет все val-фото и сравнивает экспорт с сохранёнными
+нативными предсказаниями (`--model`, `--annotations`, `--images`, `--reference`,
+`--output`). Отчёт содержит метрики, расхождения рамок и вероятностей.
+
 Есть 41 пересечение предметов между фактическими train/val, включая 8 между негативами; manifest фиксирует их. Общих файлов и SHA256 нет. Независимого test нет. Порог
 подбирается только на val; метрики короткого прогона не являются итоговым
 качеством модели.

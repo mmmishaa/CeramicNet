@@ -10,3 +10,4 @@ clearml.conf
 runs/
 *.pt
 *.pth
+*.onnx

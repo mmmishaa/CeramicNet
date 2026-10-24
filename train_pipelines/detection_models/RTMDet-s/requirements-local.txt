@@ -20,3 +20,5 @@ psutil
 nbformat
 nbclient
 ipykernel
+onnx==1.17.0
+onnxruntime==1.20.1
