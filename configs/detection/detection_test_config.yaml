@@ -1,0 +1,26 @@
+dataset:
+  coco_json: "ceramic_dataset/annotations/instances_default.json"
+  images_dir: "ceramic_dataset/images"
+  negatives_dir: "ceramic_dataset/negatives"
+  random_state: 42
+  train: 0.8
+  val: 0.2
+
+confidence_config:
+  conf_threshold: 0.75
+  iou_threshold: 0.5
+
+models:
+  - name: "yolo26s_v1"
+    type: "onnx"
+    processor_module: "src.detection.yolo_processing"
+    process_class: "YOLOProcessing"
+    weights_path: "weights/detection_weights/yolo26s_v1.onnx"
+    imgsz: 640
+
+  - name: "yolo26s_v2"
+    type: "onnx"
+    processor_module: "src.detection.yolo_processing"
+    process_class: "YOLOProcessing"
+    weights_path: "weights/detection_weights/yolo26s_v2.onnx"
+    imgsz: 640
