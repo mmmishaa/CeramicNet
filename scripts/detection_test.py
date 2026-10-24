@@ -347,7 +347,7 @@ def main():
         session = ort.InferenceSession(str(weights_path), providers=providers)
         
         input_name = session.get_inputs()[0].name
-        output_name = session.get_outputs()[0].name
+        output_names = [item.name for item in session.get_outputs()]
 
         latencies = []
         records = []
@@ -364,7 +364,7 @@ def main():
                 image_np, target_size=(imgsz, imgsz)
             )
 
-            raw_outputs = session.run([output_name], {input_name: blob})
+            raw_outputs = session.run(output_names, {input_name: blob})
 
             pred_boxes, pred_scores = processor.postprocess(
                 output=raw_outputs,

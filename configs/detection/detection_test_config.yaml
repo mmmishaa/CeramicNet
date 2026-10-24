@@ -24,3 +24,10 @@ models:
     process_class: "YOLOProcessing"
     weights_path: "weights/detection_weights/yolo26s_v2.onnx"
     imgsz: 640
+
+  - name: "rtdetr_v2_s"
+    type: "onnx"
+    processor_module: "src.detection.rtdetr_processing"
+    process_class: "RTDetrProcessing"
+    weights_path: "weights/detection_weights/rtdetr_v2_s.onnx"
+    imgsz: 640
