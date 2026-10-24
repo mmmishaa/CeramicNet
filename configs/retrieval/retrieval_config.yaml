@@ -1,0 +1,27 @@
+# Сколько ближайших клейм эталона возвращать.
+# Перекрывается аргументом --top-k и аргументом predict(..., top_k=).
+top_k: 3
+
+confidence_config:
+  conf_threshold: 0.75
+  iou_threshold: 0.5
+
+encoder:
+  weights: "weights/embedding_weights/encoder_finetuned.onnx"
+  input_size: 224
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
+  num_threads: 4
+
+index:
+  path: "weights/retrieval/books_index_finetuned.npz"
+
+# Пустые dir и meta_csv: ищем artifacts/books и artifacts/meta.csv рядом с репозиторием.
+books:
+  dir:
+  meta_csv:
+
+detector:
+  weights: "weights/detection_weights/yolo26s_v2.onnx"
+  imgsz: 640
+  processor: "src.detection.yolo_processing.YOLOProcessing"
