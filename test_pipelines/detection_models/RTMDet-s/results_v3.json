@@ -1,0 +1,73 @@
+{
+  "model": "RTMDet-s",
+  "date": "2026-10-24",
+  "split_version": "v3_seed42_reserve80_active15",
+  "split_fingerprint": "eced90ae61411c4e7d05e34b9c99281b4dd91226e123a83eb7f2aaa33623a1a1",
+  "split_files_sha256": {
+    "train": "d50091567252d2f28f26614ed02e6dfc614fe7a48de7b8ffc75d4c81e9462242",
+    "val": "1e413a0003ecffe4b4b3526120325f03ae7de0b1c52c6d07443c8d802e0441c1",
+    "manifest": "8b6ee2a93537aeef6df40703050024e8e6601ba24a9dd45ba954d80950b0c454",
+    "negative_train_reserve": "5b9cc35cdef73ade58e4f582c3ec33227d4f2f1ded1c0929fccd1cffa4d6c42e",
+    "negative_unused": "5582a81d49f4f1b0c525aaa62d44168720100001e4d58ec942b31f4b5e490fcb"
+  },
+  "training": {
+    "epochs_completed": 50,
+    "batch_size": 2,
+    "image_size": 640,
+    "seed": 42,
+    "augmentation": "light",
+    "device": "cpu"
+  },
+  "best_checkpoint": "best_coco_bbox_mAP_epoch_49.pth",
+  "checkpoint_sha256": "aeeccbc3d7a817ae535c6a8725a1b475cc01d88af6df58f3fda5469ee0efb538",
+  "validation": {
+    "images": 145,
+    "positive_images": 51,
+    "negative_images": 94,
+    "coco": {
+      "map_50_95": 0.6536394040197301,
+      "ap50": 0.8480805651746501,
+      "ap75": 0.693171933009567,
+      "ap_small": 0.4098421723360454,
+      "ap_medium": 0.5967290492835947,
+      "ap_large": 0.7719600756730738,
+      "ar1": 0.7423076923076923,
+      "ar10": 0.7615384615384615,
+      "ar100": 0.7903846153846155,
+      "ar_small": 0.7,
+      "ar_medium": 0.725,
+      "ar_large": 0.8576923076923076
+    },
+    "fixed_threshold_operating_point": {
+      "threshold": 0.5,
+      "iou_threshold": 0.5,
+      "category_id": null,
+      "tp": 43,
+      "fp": 10,
+      "fn": 9,
+      "precision": 0.8113207547169812,
+      "recall": 0.8269230769230769,
+      "f1": 0.819047619047619,
+      "negative_images": 94,
+      "negative_image_fpr": 0.0851063829787234
+    },
+    "precision_90_operating_point": {
+      "threshold": 0.84,
+      "iou_threshold": 0.5,
+      "category_id": null,
+      "tp": 27,
+      "fp": 3,
+      "fn": 25,
+      "precision": 0.9,
+      "recall": 0.5192307692307693,
+      "f1": 0.6585365853658537,
+      "negative_images": 94,
+      "negative_image_fpr": 0.02127659574468085
+    }
+  },
+  "limitations": [
+    "Validation selected checkpoint and threshold; no independent test set",
+    "41 object groups overlap between train and val; no shared files or SHA256",
+    "All-stamps metrics include 203 training photos and are not an independent quality estimate"
+  ]
+}
