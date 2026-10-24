@@ -16,11 +16,15 @@ os.environ["OPENCV_LOG_LEVEL"] = "ERROR"
 from src.paths import ROOT_DIR, REPORTS_DIR, CONFIGS_DIR
 from src.detection.dataset import TestDetectionDataset
 
-def load_processor(module_path: str, class_name: str):
+def load_processor(processor_path: str, **kwargs):
+    module_path, class_name = processor_path.rsplit('.', 1)
+    
     module = importlib.import_module(module_path)
     if not hasattr(module, class_name):
         raise AttributeError(f"В модуле '{module_path}' не найден класс '{class_name}'")
+    
     processor_cls = getattr(module, class_name)
+
     return processor_cls()
 
 
@@ -301,15 +305,16 @@ def main():
         random_state=random_state,
     )
 
-    models_to_test = config["models"]
+    all_detectors = config.get("detectors", {})
     target_model_name = args.model or config.get("run_only")
+
     if target_model_name:
-        models_to_test = [m for m in models_to_test if m["name"] == target_model_name]
-        if not models_to_test:
-            available = [m["name"] for m in config["models"]]
-            raise ValueError(
-                f"Модель '{target_model_name}' не найдена в конфиге. Доступны: {available}"
-            )
+        if target_model_name not in all_detectors:
+            available = list(all_detectors.keys())
+            raise ValueError(f"Модель '{target_model_name}' не найдена. Доступны: {available}")
+        models_to_test = [(target_model_name, all_detectors[target_model_name])]
+    else:
+        models_to_test = list(all_detectors.items())
 
     num_positive = sum(1 for item in dataset.items if len(item["boxes"]) > 0)
     num_negative = len(dataset) - num_positive
@@ -319,28 +324,27 @@ def main():
 
     new_results = []
 
-    for model_cfg in models_to_test:
-        name = model_cfg["name"]
-        raw_weights = model_cfg.get("weights_path")
+    for name, model_cfg in models_to_test:
+        raw_weights = model_cfg.get("weights")
         weights_path = ROOT_DIR / raw_weights if raw_weights else None
         
-        process_target = model_cfg.get("processor_module") or model_cfg.get("process_file")
-        process_class = model_cfg.get("process_class")
+        processor_path = model_cfg.get("processor")
         imgsz = int(model_cfg.get("imgsz", 640))
 
         if not weights_path or not weights_path.is_file():
             print(f"\n[ОШИБКА] Файл весов для {name} не найден: {weights_path}")
             continue
 
-        if not process_target or not process_class:
-            print(f"\n[ОШИБКА] Для модели {name} не указаны процессор или класс")
+        if not processor_path:
+            print(f"\n[ОШИБКА] Для модели {name} не указан путь к процессору")
             continue
 
-        processor = load_processor(process_target, process_class)
+        proc_params = {k: v for k, v in model_cfg.items() if k not in ['processor', 'weights']}
+        processor = load_processor(processor_path, **proc_params)
 
         print(f"\nЗапуск модели: {name}")
         print(f"Веса: {weights_path}")
-        print(f"Класс процессора: {process_class} ({process_target})")
+        print(f"Путь процессора: {processor_path}")
 
         available = ort.get_available_providers()
         providers = [p for p in ["CUDAExecutionProvider", "CPUExecutionProvider"] if p in available]

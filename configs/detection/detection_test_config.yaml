@@ -10,17 +10,13 @@ confidence_config:
   conf_threshold: 0.75
   iou_threshold: 0.5
 
-models:
-  - name: "yolo26s_v1"
-    type: "onnx"
-    processor_module: "src.detection.yolo_processing"
-    process_class: "YOLOProcessing"
-    weights_path: "weights/detection_weights/yolo26s_v1.onnx"
+detectors:
+  yolo26s_v1:
+    weights: "weights/detection_weights/yolo26s_v1.onnx"
     imgsz: 640
-
-  - name: "yolo26s_v2"
-    type: "onnx"
-    processor_module: "src.detection.yolo_processing"
-    process_class: "YOLOProcessing"
-    weights_path: "weights/detection_weights/yolo26s_v2.onnx"
+    processor: "src.detection.yolo_processing.YOLOProcessing"
+  
+  yolo26s_v2:
+    weights: "weights/detection_weights/yolo26s_v2.onnx"
     imgsz: 640
+    processor: "src.detection.yolo_processing.YOLOProcessing"
