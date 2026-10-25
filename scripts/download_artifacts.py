@@ -38,9 +38,11 @@ def main() -> None:
     retrieval_target = WEIGHTS_DIR / "retrieval_weights"
     dataset_target = DATA_DIR / "ceramic_dataset"
     books_target = DATA_DIR / "books"
+    index_target = DATA_DIR / "books_index"
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     WEIGHTS_DIR.mkdir(parents=True, exist_ok=True)
+    index_target.mkdir(parents=True, exist_ok=True)
 
     if temp_dir.exists():
         shutil.rmtree(temp_dir)
@@ -63,6 +65,12 @@ def main() -> None:
     ret_source = next((p for p in temp_dir.rglob("*") if p.is_dir() and "retrieval" in p.name.lower()), None)
     if ret_source:
         copy_weights_by_pattern(ret_source, retrieval_target, "*.onnx")
+
+    for npz_file in temp_dir.rglob("*.npz"):
+        if npz_file.is_file():
+            dst = index_target / npz_file.name
+            shutil.copy2(npz_file, dst)
+            print(f"Added index: {npz_file.name} -> {index_target.name}")
 
     meta_file = next(temp_dir.rglob("meta.csv"), None)
     if meta_file and meta_file.is_file():
