@@ -12,13 +12,13 @@ import faiss
 import numpy as np
 import torch
 
-from finetune.data_utils import BookSample, square_tensor
+from finetune.data_utils import BookSample
 from finetune.model import DinoEncoder
 from src.detection.detector import StampDetector
 from src.detection.yolo_processing import YOLOProcessing
 from src.paths import WEIGHTS_DIR
 from src.preprocessing.crop import crop_stamp
-from src.preprocessing.image import fit_square, read_bgr
+from src.preprocessing.image import enhance_stamp_contrast, fit_square, read_bgr
 
 
 class StampRetriever:
@@ -75,7 +75,7 @@ class StampRetriever:
         crop = self._best_crop(image)
         if crop is None:
             return []
-        crop = fit_square(crop, 224)
+        crop = enhance_stamp_contrast(fit_square(crop, 224))
 
         rgb = crop[:, :, ::-1].astype(np.float32) / 255.0
         tensor = torch.from_numpy(np.transpose(rgb, (2, 0, 1))).unsqueeze(0)
@@ -95,7 +95,7 @@ class StampRetriever:
                     "score": float(score),
                     "mark_id": sample.mark_id,
                     "book": sample.book,
-                    "factory_norm": sample.factory_norm,
+                    "factory": sample.factory,
                     "catalog_no": sample.catalog_no,
                     "page": sample.page,
                     "image_path": str(sample.path),
@@ -115,7 +115,7 @@ class StampRetriever:
             batch.clear()
 
         for sample in self.samples:
-            batch.append(square_tensor(sample.path))
+            batch.append(_enhanced_square(sample.path))
             if len(batch) == 64:
                 flush()
         flush()
@@ -136,6 +136,13 @@ class StampRetriever:
         if float(scores[best]) < self.conf_threshold:
             return None
         return crop_stamp(image, boxes[best], target_size=224)
+
+
+def _enhanced_square(path: Path) -> torch.Tensor:
+    """Книжный кроп: квадрат, CLAHE, RGB 0..1. Ч/б делает энкодер."""
+    square = enhance_stamp_contrast(fit_square(read_bgr(path), 224))
+    rgb = square[:, :, ::-1].astype(np.float32) / 255.0
+    return torch.from_numpy(np.transpose(rgb, (2, 0, 1)))
 
 
 def _encode(encoder: DinoEncoder, images: torch.Tensor) -> np.ndarray:

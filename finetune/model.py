@@ -1,4 +1,4 @@
-"""DINOv2: ч/б, заморозка ранних блоков, голова фабрики для дистилляции."""
+"""DINOv2: ч/б до энкодера, учим только последние блоки и norm."""
 
 from __future__ import annotations
 
@@ -10,23 +10,6 @@ from finetune.data_utils import GrayscaleBT601
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
 MODEL_NAME = "vit_small_patch14_dinov2.lvd142m"
-
-
-class FactoryHead(nn.Module):
-    """Слабая голова: эмбеддинг 384 -> логиты фабрик. Та же схема у учителя и у студента."""
-
-    def __init__(self, num_factories: int) -> None:
-        super().__init__()
-        if num_factories < 2:
-            raise ValueError("Для учителя нужно хотя бы две фабрики")
-        self.net = nn.Sequential(
-            nn.Linear(384, 128),
-            nn.ReLU(inplace=True),
-            nn.Linear(128, num_factories),
-        )
-
-    def forward(self, embeddings: torch.Tensor) -> torch.Tensor:
-        return self.net(embeddings)
 
 
 class DinoEncoder(nn.Module):
@@ -73,16 +56,14 @@ class DinoEncoder(nn.Module):
 
 
 class Student(nn.Module):
-    """Энкодер, который учится, и голова фабрики для KL к замороженному учителю."""
+    """Энкодер без головы: на поиске нужен только вектор 384."""
 
-    def __init__(self, num_factories: int, unfreeze_blocks: int = 2) -> None:
+    def __init__(self, unfreeze_blocks: int = 2) -> None:
         super().__init__()
         self.encoder = DinoEncoder(unfreeze_blocks=unfreeze_blocks, pretrained=True)
-        self.head = FactoryHead(num_factories)
 
-    def forward(self, images: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        embeddings = self.encoder(images)
-        return embeddings, self.head(embeddings)
+    def forward(self, images: torch.Tensor) -> torch.Tensor:
+        return self.encoder(images)
 
     def embed(self, images: torch.Tensor) -> torch.Tensor:
         return self.encoder(images)

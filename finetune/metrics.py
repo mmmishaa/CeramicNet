@@ -140,7 +140,7 @@ def _soft_neighbor_preservation(
 
 
 def _intra_factory_diversity(embeddings: torch.Tensor, books: list[BookSample]) -> float:
-    """Среднее (1 - косинус) между разными клеймами одной factory_norm. Ноль значило бы, что они слиплись."""
+    """Среднее (1 - косинус) между разными клеймами одной фабрики. Ноль значило бы, что они слиплись."""
     groups: dict[int, list[int]] = {}
     for index, sample in enumerate(books):
         if sample.factory_id < 0:
