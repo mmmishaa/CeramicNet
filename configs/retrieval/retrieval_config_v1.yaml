@@ -1,0 +1,27 @@
+# Поиск энкодером finetuned_v1. Не подменяет configs/retrieval/retrieval_config.yaml.
+# Ч/б BT.601 и ImageNet-нормировка уже внутри student_encoder.onnx,
+# поэтому здесь картинка только переводится в диапазон 0..1.
+top_k: 3
+
+confidence_config:
+  conf_threshold: 0.75
+  iou_threshold: 0.5
+
+encoder:
+  weights: "weights/finetuned_v1/student_encoder.onnx"
+  input_size: 224
+  mean: [0.0, 0.0, 0.0]
+  std: [1.0, 1.0, 1.0]
+  num_threads: 4
+
+index:
+  path: "weights/finetuned_v1/books_index.npz"
+
+books:
+  dir:
+  meta_csv:
+
+detector:
+  weights: "weights/detection_weights/yolo26s_v2.onnx"
+  imgsz: 640
+  processor: "src.detection.yolo_processing.YOLOProcessing"
