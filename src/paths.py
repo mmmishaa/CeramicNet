@@ -6,4 +6,7 @@ CONFIGS_DIR = ROOT_DIR / "configs"
 SCRIPTS_DIR = ROOT_DIR / "scripts"
 REPORTS_DIR = ROOT_DIR / "reports"
 WEIGHTS_DIR = ROOT_DIR / "weights"
-DATA_DIR = ROOT_DIR / "ceramic_dataset"
+
+DATA_DIR = ROOT_DIR / "data"
+CERAMIC_DATA_DIR = DATA_DIR / "ceramic_dataset"
+BOOKS_DIR = DATA_DIR / "books"

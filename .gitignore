@@ -1,6 +1,6 @@
 weights/
 __pycache__
-ceramic_dataset
+data
 reports/
 runs/
 .DS_Store
