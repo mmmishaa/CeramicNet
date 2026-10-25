@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import onnxruntime as ort
 
-from src.preprocessing.image import fit_square
+from src.preprocessing.image import enhance_stamp_contrast, fit_square
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
@@ -17,6 +17,7 @@ class StampEncoder:
         mean: tuple[float, float, float] = IMAGENET_MEAN,
         std: tuple[float, float, float] = IMAGENET_STD,
         num_threads: int = 4,
+        enhance_contrast: bool = False,
     ):
         self.model_path = Path(model_path)
         if not self.model_path.is_file():
@@ -54,6 +55,7 @@ class StampEncoder:
 
         self.input_size = input_size
         self.batch_limit = batch_limit
+        self.enhance_contrast = enhance_contrast
 
     @classmethod
     def from_mapping(cls, mapping: dict, weights: str | Path | None = None) -> "StampEncoder":
@@ -64,6 +66,7 @@ class StampEncoder:
             mean=tuple(mapping.get("mean", IMAGENET_MEAN)),
             std=tuple(mapping.get("std", IMAGENET_STD)),
             num_threads=int(mapping.get("num_threads", 4)),
+            enhance_contrast=bool(mapping.get("enhance_contrast", False)),
         )
 
     def embed(self, image: np.ndarray) -> np.ndarray:
@@ -87,6 +90,8 @@ class StampEncoder:
             raise ValueError(f"Ожидался цветной кадр HWC, получено: {image.shape}")
 
         square = fit_square(image, self.input_size)
+        if self.enhance_contrast:
+            square = enhance_stamp_contrast(square)
         rgb = square[:, :, ::-1]
         if self.uint8_input:
             tensor = rgb if not self.channels_first else rgb.transpose(2, 0, 1)

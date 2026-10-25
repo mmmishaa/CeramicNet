@@ -17,7 +17,7 @@ from torchvision import transforms
 
 from src.paths import ROOT_DIR
 from src.preprocessing.crop import crop_stamp
-from src.preprocessing.image import fit_square, read_bgr
+from src.preprocessing.image import enhance_stamp_contrast, fit_square, read_bgr
 from src.retrieval.books import resolve_reference
 
 INPUT_SIZE = 224
@@ -46,7 +46,7 @@ class GrayscaleBT601(nn.Module):
 class BookSample:
     mark_id: str
     path: Path
-    factory_norm: str
+    factory: str
     factory_id: int
     book: str
     page: str
@@ -60,8 +60,8 @@ class RealSample:
     file_name: str
 
 
-def load_books(meta_csv: Path | None = None, books_dir: Path | None = None) -> tuple[list[BookSample], list[str]]:
-    """Книжные кропы и словарь фабрик. Пустой factory_norm получает id -1 и не учит учителя."""
+def load_books(meta_csv: Path | None = None, books_dir: Path | None = None) -> list[BookSample]:
+    """Книжные кропы. Пустая фабрика получает id -1 и не входит в метрику разнообразия."""
     if meta_csv is None or books_dir is None:
         discovered_books, discovered_meta = resolve_reference(None, None)
         books_dir = books_dir or discovered_books
@@ -72,12 +72,12 @@ def load_books(meta_csv: Path | None = None, books_dir: Path | None = None) -> t
     rows: list[dict[str, str]] = []
     with meta_csv.open(encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
-        if reader.fieldnames is None or "factory_norm" not in reader.fieldnames:
-            raise ValueError(f"В {meta_csv} нет колонки factory_norm")
+        if reader.fieldnames is None or "image_path" not in reader.fieldnames:
+            raise ValueError(f"В {meta_csv} нет колонки image_path")
         rows = list(reader)
 
     for row in rows:
-        factory = (row.get("factory_norm") or "").strip()
+        factory = (row.get("factory") or "").strip()
         if factory and factory not in name_to_id:
             name_to_id[factory] = len(names)
             names.append(factory)
@@ -87,12 +87,12 @@ def load_books(meta_csv: Path | None = None, books_dir: Path | None = None) -> t
         relative = Path((row.get("image_path") or "").replace("\\", "/").strip())
         if relative.as_posix() in {"", "."}:
             continue
-        factory = (row.get("factory_norm") or "").strip()
+        factory = (row.get("factory") or "").strip()
         samples.append(
             BookSample(
                 mark_id=(row.get("mark_id") or "").strip(),
                 path=books_dir / relative,
-                factory_norm=factory,
+                factory=factory,
                 factory_id=name_to_id[factory] if factory else -1,
                 book=(row.get("book") or "").strip(),
                 page=(row.get("page") or "").strip(),
@@ -101,7 +101,7 @@ def load_books(meta_csv: Path | None = None, books_dir: Path | None = None) -> t
         )
     if not samples:
         raise ValueError(f"В {meta_csv} нет клейм")
-    return samples, names
+    return samples
 
 
 def default_coco_dir() -> Path:
@@ -148,24 +148,26 @@ def _to_pil(image_bgr: np.ndarray) -> Image.Image:
 
 
 def load_book_pil(path: Path) -> Image.Image:
-    return _to_pil(read_bgr(path))
+    square = enhance_stamp_contrast(fit_square(read_bgr(path), INPUT_SIZE))
+    return _to_pil(square)
 
 
 def load_real_pil(sample: RealSample) -> Image.Image:
     image = read_bgr(sample.path)
     crop = crop_stamp(image, sample.box, target_size=INPUT_SIZE)
-    return _to_pil(crop)
+    return _to_pil(enhance_stamp_contrast(crop))
 
 
 def square_tensor(path: Path) -> torch.Tensor:
-    """Книжный кроп без аугментации: квадрат 224, RGB в диапазоне 0..1. Ч/б делает модель."""
+    """Книжный кроп: квадрат, CLAHE и резкость, RGB 0..1. Ч/б делает модель."""
     square = fit_square(read_bgr(path), INPUT_SIZE)
-    rgb = square[:, :, ::-1].astype(np.float32) / 255.0
+    enhanced = enhance_stamp_contrast(square)
+    rgb = enhanced[:, :, ::-1].astype(np.float32) / 255.0
     return torch.from_numpy(np.transpose(rgb, (2, 0, 1)))
 
 
 class GaussianNoise:
-    """Лёгкий шум для реальных кропов. Сильное размытие и random crop сюда не входят."""
+    """Лёгкий шум для реальных кропов. Кроп и сильное размытие сюда не входят."""
 
     def __init__(self, std: float = 0.02) -> None:
         self.std = std
@@ -175,13 +177,17 @@ class GaussianNoise:
 
 
 def book_transform() -> transforms.Compose:
-    """Поворот 0..180° и обрезка вплоть до половины кадра. Это позитивная пара одного клейма."""
+    """Поворот 0..180°, мягкий кроп со сдвигом окна и лёгкое размытие.
+
+    scale от 0.75 сохраняет мелкие детали клейма. Размытие срабатывает с вероятностью 0.3.
+    """
     return transforms.Compose(
         [
             transforms.RandomRotation(degrees=(0, 180), fill=114),
             transforms.RandomResizedCrop(
                 INPUT_SIZE,
-                scale=(0.5, 1.0),
+                scale=(0.75, 1.0),
+                ratio=(0.75, 1.333),
                 interpolation=transforms.InterpolationMode.BILINEAR,
             ),
             transforms.RandomApply(
@@ -194,11 +200,14 @@ def book_transform() -> transforms.Compose:
 
 
 def real_transform() -> transforms.Compose:
-    """Мягкие аугментации реала. RandomResizedCrop и сильное размытие запрещены."""
+    """Полный поворот тарелки, лёгкий цвет и шум. Кропа и размытия нет.
+
+    Полевой кроп и так частичный, вторая обрезка срезает клеймо.
+    """
     return transforms.Compose(
         [
-            transforms.RandomRotation(degrees=15, fill=114),
-            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0.02),
+            transforms.RandomRotation(degrees=(0, 360), fill=114),
+            transforms.ColorJitter(brightness=0.4, contrast=0.4),
             transforms.ToTensor(),
             GaussianNoise(std=0.02),
         ]

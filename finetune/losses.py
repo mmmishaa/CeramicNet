@@ -1,28 +1,16 @@
-"""KD по мягким фабрикам и Barlow Twins по двум видам одного кропа."""
+"""Barlow Twins: два вида одного клейма, без негативов и без учителя."""
 
 from __future__ import annotations
 
 import torch
-import torch.nn.functional as F
 from torch import nn
-
-
-def kd_loss(student_logits: torch.Tensor, soft_targets: torch.Tensor, temperature: float) -> torch.Tensor:
-    """KL между студентом и уже посчитанными soft targets учителя.
-
-    soft_targets = softmax(teacher / T). Деление логитов студента на T и множитель T^2
-    сохраняют масштаб градиента, как в дистилляции Хинтона.
-    """
-    log_prob = F.log_softmax(student_logits / temperature, dim=-1)
-    return F.kl_div(log_prob, soft_targets, reduction="batchmean") * (temperature ** 2)
 
 
 class BarlowTwinsLoss(nn.Module):
     """Кросс-корреляция двух видов: диагональ к 1, остальные элементы к 0.
 
-    Так один клейм становится устойчивым к повороту и обрезке, но компоненты вектора
-    не копируют друг друга. Похожие чужие клейма здесь не объявляются жёсткими негативами,
-    в отличие от InfoNCE: штраф только за лишнюю корреляцию признаков внутри пары.
+    Похожие чужие клейма здесь не расталкиваются. Штраф только за то,
+    что компоненты вектора копируют друг друга внутри пары.
     """
 
     def __init__(self, lambda_off: float = 5e-3) -> None:

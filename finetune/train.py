@@ -1,10 +1,14 @@
-"""Учитель по фабрикам, затем студент: KD + Barlow на книгах и Barlow на реале."""
+"""Дообучение DINOv2 чистым Barlow Twins: книги и реал, без учителя."""
 
 from __future__ import annotations
 
 import argparse
 from itertools import cycle
 
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from PIL import Image, ImageDraw
@@ -12,24 +16,21 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from finetune.data_utils import BookPairDataset, RealPairDataset, load_books, load_real_crops, square_tensor
-from finetune.losses import BarlowTwinsLoss, kd_loss
+from finetune.losses import BarlowTwinsLoss
 from finetune.metrics import evaluate_epoch
 from finetune.model import DinoEncoder, Student
-from finetune.weak_teacher import WeakTeacher, train_weak_teacher
 from src.paths import WEIGHTS_DIR
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Дообучение DINOv2: KD по фабрике и Barlow Twins")
-    parser.add_argument("--epochs", type=int, default=30)
-    parser.add_argument("--teacher-epochs", type=int, default=8)
+    parser = argparse.ArgumentParser(description="Дообучение DINOv2 чистым Barlow Twins")
+    parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--batch-size", type=int, default=64)
-    parser.add_argument("--lr", type=float, default=1e-5)
-    parser.add_argument("--temperature", type=float, default=3.0)
+    parser.add_argument("--lr", type=float, default=2e-5)
     parser.add_argument("--unfreeze-blocks", type=int, default=2)
     parser.add_argument("--log-every", type=int, default=20)
-    parser.add_argument("--num-workers", type=int, default=0)
-    parser.add_argument("--max-steps", type=int, default=0, help="Остановиться после N шагов студента. 0 — вся эпоха.")
+    parser.add_argument("--num-workers", type=int, default=None)
+    parser.add_argument("--max-steps", type=int, default=0, help="Остановиться после N шагов. 0 — все эпохи.")
     return parser.parse_args()
 
 
@@ -40,97 +41,96 @@ def main() -> None:
 
     torch.manual_seed(42)
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    # 4 воркера на Mac не блокируют MPS. Явный --num-workers 0 отключает их.
+    num_workers = 4 if device.type == "mps" else 0
+    if args.num_workers is not None:
+        num_workers = args.num_workers
     task, logger = _init_clearml()
     print(f"Устройство: {device}")
 
-    books, factory_names = load_books()
-    books = [sample for sample in books if sample.path.is_file()]
+    books = [sample for sample in load_books() if sample.path.is_file()]
     reals = load_real_crops()
-    print(f"Книг: {len(books)}, фабрик: {len(factory_names)}, реальных кропов: {len(reals)}")
+    print(f"Книг: {len(books)}, реальных кропов: {len(reals)}")
 
     baseline = DinoEncoder(unfreeze_blocks=0, pretrained=True).to(device).eval()
     baseline_embeddings = _embed_clean(baseline, books, device)
-    factory_ids = torch.tensor([sample.factory_id for sample in books], dtype=torch.long)
 
-    teacher = WeakTeacher(len(factory_names))
-    teacher_losses = train_weak_teacher(
-        teacher,
-        baseline_embeddings,
-        factory_ids,
-        epochs=args.teacher_epochs,
-        device=device,
-    )
-    for epoch, loss in enumerate(teacher_losses, start=1):
-        print(f"Учитель, эпоха {epoch}: loss {loss:.4f}")
-        _scalar(logger, "teacher", "loss", loss, epoch)
-
-    student = Student(len(factory_names), unfreeze_blocks=args.unfreeze_blocks).to(device)
+    student = Student(unfreeze_blocks=args.unfreeze_blocks).to(device)
     parameters = [parameter for parameter in student.parameters() if parameter.requires_grad]
     optimizer = torch.optim.AdamW(parameters, lr=args.lr, weight_decay=0.05)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=max(args.epochs, 1))
     barlow = BarlowTwinsLoss()
 
     book_loader = DataLoader(
         BookPairDataset(books),
         batch_size=args.batch_size,
         shuffle=True,
-        num_workers=args.num_workers,
+        num_workers=num_workers,
         drop_last=True,
     )
     real_loader = DataLoader(
         RealPairDataset(reals),
         batch_size=args.batch_size,
         shuffle=True,
-        num_workers=args.num_workers,
+        num_workers=num_workers,
         drop_last=True,
     )
+    # Реала меньше, чем книг: цикл не даёт оборвать эпоху на коротком потоке.
     real_cycle = cycle(real_loader) if len(real_loader) else None
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+        optimizer,
+        T_0=max(len(book_loader), 1),
+    )
 
-    output_dir = WEIGHTS_DIR / "finetuned_v1"
+    output_dir = WEIGHTS_DIR / "finetuned_v3"
     output_dir.mkdir(parents=True, exist_ok=True)
-    best_score = float("-inf")
+    best_recall = float("-inf")
     best_encoder_state: dict[str, torch.Tensor] | None = None
+    epoch_rows: list[dict[str, float]] = []
 
     global_step = 0
     for epoch in range(1, args.epochs + 1):
         student.train()
+        totals = {"book": 0.0, "real": 0.0, "total": 0.0, "steps": 0}
         progress = tqdm(book_loader, desc=f"Студент {epoch}/{args.epochs}", unit="batch")
-        for view_a, view_b, indexes in progress:
-            view_a = view_a.to(device)
-            view_b = view_b.to(device)
-            indexes = indexes.to(device)
+        for view_a, view_b, _indexes in progress:
+            view_a = view_a.to(device, non_blocking=True)
+            view_b = view_b.to(device, non_blocking=True)
+            with torch.autocast(device_type=device.type, dtype=torch.bfloat16):
+                emb_a = student(view_a)
+                emb_b = student(view_b)
+                if real_cycle is not None:
+                    real_a, real_b, _ = next(real_cycle)
+                    emb_real_a = student(real_a.to(device, non_blocking=True))
+                    emb_real_b = student(real_b.to(device, non_blocking=True))
+                else:
+                    emb_real_a, emb_real_b = None, None
 
-            emb_a, logits_a = student(view_a)
-            emb_b, logits_b = student(view_b)
-            soft = teacher.soft_targets(baseline_embeddings[indexes.cpu()].to(device), args.temperature)
-            loss_kd = 0.5 * (
-                kd_loss(logits_a, soft, args.temperature) + kd_loss(logits_b, soft, args.temperature)
-            )
-            loss_barlow_book = barlow(emb_a, emb_b)
-            loss_book = 0.5 * loss_kd + 0.5 * loss_barlow_book
-
+            # Ковариация Barlow в bfloat16 раздувает лосс. Считаем её в float32.
+            loss_barlow_book = barlow(emb_a.float(), emb_b.float())
             loss_barlow_real = torch.zeros((), device=device)
-            if real_cycle is not None:
-                real_a, real_b, _ = next(real_cycle)
-                real_emb_a, _ = student(real_a.to(device))
-                real_emb_b, _ = student(real_b.to(device))
-                loss_barlow_real = barlow(real_emb_a, real_emb_b)
+            if emb_real_a is not None:
+                loss_barlow_real = barlow(emb_real_a.float(), emb_real_b.float())
+            total = loss_barlow_book + loss_barlow_real
 
-            total = loss_book + loss_barlow_real
             optimizer.zero_grad(set_to_none=True)
             total.backward()
             torch.nn.utils.clip_grad_norm_(parameters, 1.0)
             optimizer.step()
-            scheduler.step()  # Стандартный вызов, планировщик сам считает шаги
+            scheduler.step()
 
             global_step += 1
             learning_rate = optimizer.param_groups[0]["lr"]
+            if global_step % 50 == 0 and device.type == "mps":
+                allocated_gb = torch.mps.current_allocated_memory() / (1024**3)
+                print(f"[MPS Memory] Выделено: {allocated_gb:.2f} GB / 36 GB")
+            totals["book"] += loss_barlow_book.detach().item()
+            totals["real"] += loss_barlow_real.detach().item()
+            totals["total"] += total.detach().item()
+            totals["steps"] += 1
             progress.set_postfix(
-                kd=f"{loss_kd.item():.3f}",
                 book=f"{loss_barlow_book.item():.3f}",
                 real=f"{loss_barlow_real.item():.3f}",
             )
-            _scalar(logger, "train", "loss_kd", loss_kd.detach().item(), global_step)
             _scalar(logger, "train", "loss_barlow_book", loss_barlow_book.detach().item(), global_step)
             _scalar(logger, "train", "loss_barlow_real", loss_barlow_real.detach().item(), global_step)
             _scalar(logger, "train", "total_loss", total.detach().item(), global_step)
@@ -151,6 +151,17 @@ def main() -> None:
             logger=logger,
             iteration=epoch,
         )
+        steps = max(totals["steps"], 1)
+        row = {
+            "epoch": float(epoch),
+            "loss_barlow_book": totals["book"] / steps,
+            "loss_barlow_real": totals["real"] / steps,
+            "total_loss": totals["total"] / steps,
+            "lr": optimizer.param_groups[0]["lr"],
+            **metrics,
+        }
+        epoch_rows.append(row)
+        _save_plots(epoch_rows, output_dir)
         print(
             "Эпоха {epoch}: recall книг {book:.3f}, сохранение соседей {soft:.3f}, "
             "recall реала {real:.3f}, разнообразие внутри фабрики {div:.3f}".format(
@@ -161,38 +172,33 @@ def main() -> None:
                 div=metrics["intra_factory_diversity"],
             )
         )
-        # Критерий best: клеймо узнаёт свой кроп и при этом не выкидывает мягких соседей baseline.
-        score = metrics["book_recall_at_1"] + metrics["soft_neighbor_preservation"]
-        payload = _checkpoint_payload(student, teacher, factory_names, args.unfreeze_blocks, epoch, metrics)
+
+        payload = _checkpoint_payload(student, args.unfreeze_blocks, epoch, metrics)
         last_path = output_dir / "last_student.pt"
         torch.save(payload, last_path)
         print(f"Последние веса: {last_path}")
-        if score > best_score:
-            best_score = score
-            best_encoder_state = {
-                key.removeprefix("encoder."): value.detach().cpu().clone()
-                for key, value in student.state_dict().items()
-                if key.startswith("encoder.")
-            }
+        recall = metrics["book_recall_at_1"]
+        if recall > best_recall:
+            best_recall = recall
+            best_encoder_state = _encoder_state(student)
             best_path = output_dir / "best_student.pt"
             torch.save(payload, best_path)
-            print(f"Лучшие веса (recall@1 + соседи = {score:.3f}): {best_path}")
+            print(f"Лучшие веса (book recall@1 = {recall:.3f}): {best_path}")
+
         if args.max_steps and global_step >= args.max_steps:
             break
 
     onnx_path = output_dir / "student_encoder.onnx"
     export_encoder_onnx(best_encoder_state or _encoder_state(student), onnx_path)
     print(f"ONNX энкодера: {onnx_path}")
+    print(f"Графики: {output_dir / 'loss.png'}, {output_dir / 'metrics.png'}")
     if task is not None:
         task.close()
 
 
-def _checkpoint_payload(student, teacher, factory_names, unfreeze_blocks, epoch, metrics) -> dict:
-    """Чекпоинт на CPU: голова нужна, чтобы продолжить KD, на поиске она не используется."""
+def _checkpoint_payload(student: Student, unfreeze_blocks: int, epoch: int, metrics: dict[str, float]) -> dict:
     return {
         "student": {key: value.detach().cpu() for key, value in student.state_dict().items()},
-        "teacher": {key: value.detach().cpu() for key, value in teacher.state_dict().items()},
-        "factories": factory_names,
         "unfreeze_blocks": unfreeze_blocks,
         "epoch": epoch,
         "metrics": metrics,
@@ -208,10 +214,9 @@ def _encoder_state(student: Student) -> dict[str, torch.Tensor]:
 
 
 def export_encoder_onnx(encoder_state: dict[str, torch.Tensor], path) -> None:
-    """В ONNX уходит только энкодер: ч/б BT.601 уже внутри, голова фабрик остаётся в .pt.
+    """В ONNX уходит только энкодер: ч/б BT.601 уже внутри.
 
-    dynamo=False и external_data=False обязательны для torch 2.13: иначе экспорт
-    уходит в новый трассировщик и режет файл на внешние данные.
+    dynamo=False и external_data=False обязательны для torch 2.13, иначе файл режется на части.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     encoder = DinoEncoder(unfreeze_blocks=0, pretrained=False).eval()
@@ -246,11 +251,52 @@ def _assert_onnx_matches(encoder: DinoEncoder, path, dummy: torch.Tensor) -> Non
     print(f"ONNX совпал с PyTorch, max |Δ| = {delta:.3e}")
 
 
+def _save_plots(rows: list[dict[str, float]], output_dir) -> None:
+    epochs = [row["epoch"] for row in rows]
+    _plot(
+        epochs,
+        [
+            ("loss_barlow_book", "книги"),
+            ("loss_barlow_real", "реал"),
+            ("total_loss", "сумма"),
+        ],
+        rows,
+        "Потери Barlow Twins",
+        output_dir / "loss.png",
+    )
+    _plot(
+        epochs,
+        [
+            ("book_recall_at_1", "recall книг"),
+            ("soft_neighbor_preservation", "соседи"),
+            ("real_recall_at_1", "recall реала"),
+            ("intra_factory_diversity", "разнообразие"),
+        ],
+        rows,
+        "Метрики эпох",
+        output_dir / "metrics.png",
+    )
+
+
+def _plot(epochs, series: list[tuple[str, str]], rows: list[dict[str, float]], title: str, path) -> None:
+    fig, axis = plt.subplots(figsize=(8, 4.2))
+    for key, label in series:
+        axis.plot(epochs, [row[key] for row in rows], marker="o", label=label)
+    axis.set_title(title)
+    axis.set_xlabel("эпоха")
+    axis.legend()
+    axis.spines["top"].set_visible(False)
+    axis.spines["right"].set_visible(False)
+    fig.tight_layout()
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
+
+
 def _embed_clean(encoder: DinoEncoder, books, device: torch.device) -> torch.Tensor:
     encoder.eval()
     parts = []
     batch: list[torch.Tensor] = []
-    for sample in tqdm(books, desc="Эмбеддинги учителя", unit="mark"):
+    for sample in tqdm(books, desc="Эмбеддинги baseline", unit="mark"):
         batch.append(square_tensor(sample.path))
         if len(batch) == 64:
             parts.append(_forward_encoder(encoder, torch.stack(batch).to(device)))
@@ -302,13 +348,13 @@ def _init_clearml():
 
         task = Task.init(
             project_name="CeramicNet",
-            task_name="dino_factory_barlow_v1",  # Добавлен суффикс версии
+            task_name="dino_barlow_v3",
             auto_connect_frameworks=False,
             auto_connect_arg_parser=False,
         )
         return task, task.get_logger()
     except Exception as error:
-        print(f"ClearML недоступен, метрики останутся в консоли: {error}")
+        print(f"ClearML недоступен, метрики останутся в консоли и в png: {error}")
         return None, None
 
 
