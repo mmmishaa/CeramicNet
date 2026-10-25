@@ -1,6 +1,7 @@
 import argparse
 import importlib
 from pathlib import Path
+import random
 import yaml
 
 from src.detection.detector import StampDetector
@@ -20,6 +21,17 @@ def load_yaml(path: Path) -> dict:
     if not isinstance(data, dict):
         raise ValueError(f"Empty config: {path}")
     return data
+
+
+def get_random_image(images_dir: Path) -> Path:
+    valid_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+    candidates = [
+        path for path in images_dir.iterdir()
+        if path.is_file() and path.suffix.lower() in valid_extensions
+    ]
+    if not candidates:
+        raise FileNotFoundError(f"No valid images found in: {images_dir}")
+    return random.choice(candidates)
 
 
 def build_detector(det_cfg: dict) -> StampDetector:
@@ -58,8 +70,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--image",
         type=Path,
-        default=DATA_DIR / "ceramic_dataset" / "images" / "КБ-2014-Р5-0422_5.png",
+        default=None,
         help="Path to image for inference",
+    )
+    parser.add_argument(
+        "--random",
+        action="store_true",
+        help="Pick a random image from the dataset",
     )
     parser.add_argument(
         "--retrieval-config",
@@ -80,9 +97,15 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    image_path = project_path(args.image)
-    if not image_path.is_file():
-        raise FileNotFoundError(f"Image not found: {image_path}")
+    dataset_images_dir = DATA_DIR / "ceramic_dataset" / "images"
+
+    if args.random or args.image is None:
+        image_path = get_random_image(dataset_images_dir)
+        print(f"Selected random image: {image_path.name}")
+    else:
+        image_path = project_path(args.image)
+        if not image_path.is_file():
+            raise FileNotFoundError(f"Image not found: {image_path}")
 
     ret_cfg = load_yaml(args.retrieval_config)
     det_cfg = load_yaml(args.detection_config)
