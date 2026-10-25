@@ -1,0 +1,5 @@
+weights: "weights/detection_weights/yolo26s_v2.onnx"
+imgsz: 640
+processor: "src.detection.yolo_processing.YOLOProcessing"
+conf_threshold: 0.75
+iou_threshold: 0.5

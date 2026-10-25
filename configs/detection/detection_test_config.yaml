@@ -1,7 +1,7 @@
 dataset:
-  coco_json: "ceramic_dataset/annotations/instances_default.json"
-  images_dir: "ceramic_dataset/images"
-  negatives_dir: "ceramic_dataset/negatives"
+  coco_json: "data/ceramic_dataset/annotations/instances_default.json"
+  images_dir: "data/ceramic_dataset/images"
+  negatives_dir: "data/ceramic_dataset/negatives"
   random_state: 42
   train: 0.8
   val: 0.2

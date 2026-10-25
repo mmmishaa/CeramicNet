@@ -1,6 +1,5 @@
 import csv
 from pathlib import Path
-
 import yaml
 
 from src.paths import CONFIGS_DIR, ROOT_DIR
@@ -32,45 +31,28 @@ def load_retrieval_config(path: str | Path | None = None) -> dict:
 def resolve_reference(
     books_dir: str | Path | None = None,
     meta_csv: str | Path | None = None,
+    config_path: str | Path | None = None,
 ) -> tuple[Path, Path]:
-    if books_dir:
-        books = project_path(books_dir)
-        meta = project_path(meta_csv) if meta_csv else books.parent / "meta.csv"
-    else:
-        books, meta = discover_reference()
-        if meta_csv:
-            meta = project_path(meta_csv)
+    config = load_retrieval_config(config_path)
+    books_cfg = config.get("books", {})
+
+    target_books = books_dir or books_cfg.get("dir")
+    target_meta = meta_csv or books_cfg.get("meta_csv")
+
+    if not target_books:
+        raise ValueError("Путь к папке books не указан в аргументах и отсутствует в конфиге")
+    if not target_meta:
+        raise ValueError("Путь к meta_csv не указан в аргументах и отсутствует в конфиге")
+
+    books = project_path(target_books)
+    meta = project_path(target_meta)
 
     if not books.is_dir():
         raise FileNotFoundError(f"Папка эталона не найдена: {books}")
     if not meta.is_file():
         raise FileNotFoundError(f"Описание эталона не найдено: {meta}")
+
     return books, meta
-
-
-def discover_reference() -> tuple[Path, Path]:
-    found = []
-    for base in (ROOT_DIR, ROOT_DIR.parent):
-        if not base.is_dir():
-            continue
-        candidates = [base, *[path for path in base.iterdir() if path.is_dir()]]
-        for folder in candidates:
-            books = folder / "artifacts" / "books"
-            meta = folder / "artifacts" / "meta.csv"
-            if books.is_dir() and meta.is_file():
-                found.append((books, meta))
-
-    unique = list(dict.fromkeys(found))
-    if len(unique) == 1:
-        return unique[0]
-    if len(unique) > 1:
-        listed = ", ".join(str(books) for books, _ in unique)
-        raise FileNotFoundError(
-            f"Найдено несколько эталонов, укажите --books явно: {listed}"
-        )
-    raise FileNotFoundError(
-        "Эталон books не найден. Передайте --books и, если нужно, --meta."
-    )
 
 
 def load_book_records(meta_csv: Path, books_dir: Path) -> list[dict]:
