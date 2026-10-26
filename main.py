@@ -4,24 +4,15 @@ from pathlib import Path
 import random
 import yaml
 
-from src.detection.detector import StampDetector
 from src.paths import CONFIGS_DIR, DATA_DIR, REPORTS_DIR
 from src.pipeline import CeramicPipeline
 from src.retrieval.books import project_path, resolve_reference
 from src.retrieval.encoder import StampEncoder
 from src.retrieval.index import StampIndex
+from src.detection.detector import StampDetector
 from src.retrieval.preview import open_preview, render_preview
 
-
-def load_yaml(path: Path) -> dict:
-    if not path.is_file():
-        raise FileNotFoundError(f"Config not found: {path}")
-    with path.open(encoding="utf-8") as handle:
-        data = yaml.safe_load(handle)
-    if not isinstance(data, dict):
-        raise ValueError(f"Empty config: {path}")
-    return data
-
+from src.utils import load_yaml
 
 def get_random_image(images_dir: Path) -> Path:
     valid_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
@@ -32,38 +23,6 @@ def get_random_image(images_dir: Path) -> Path:
     if not candidates:
         raise FileNotFoundError(f"No valid images found in: {images_dir}")
     return random.choice(candidates)
-
-
-def build_detector(det_cfg: dict) -> StampDetector:
-    weights = project_path(det_cfg["weights"])
-    if not weights.is_file():
-        raise FileNotFoundError(f"Detector weights not found: {weights}")
-
-    module_path, class_name = det_cfg["processor"].rsplit(".", 1)
-    module = importlib.import_module(module_path)
-    processor = getattr(module, class_name)()
-
-    image_size = int(det_cfg.get("imgsz", 640))
-    conf_threshold = float(det_cfg.get("conf_threshold", 0.75))
-    iou_threshold = float(det_cfg.get("iou_threshold", 0.5))
-
-    class SizedProcessor:
-        def __init__(self, inner):
-            self.inner = inner
-
-        def preprocess(self, image):
-            return self.inner.preprocess(image, target_size=(image_size, image_size))
-
-        def postprocess(self, output, metadata):
-            return self.inner.postprocess(
-                output,
-                metadata,
-                conf_threshold=conf_threshold,
-                iou_threshold=iou_threshold,
-            )
-
-    return StampDetector(weights, SizedProcessor(processor))
-
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Test CeramicNet Pipeline")
@@ -125,9 +84,16 @@ def main() -> None:
 
     top_k = args.top_k if args.top_k is not None else int(ret_cfg.get("top_k", 3))
 
-    detector = None
-    if not args.no_detect:
-        detector = build_detector(det_cfg)
+    module_path, class_name = det_cfg["processor"].rsplit(".", 1)
+    module = importlib.import_module(module_path)
+
+    processor = getattr(module, class_name)(
+        imgsz=det_cfg.get("imgsz", 640),
+        conf_threshold=det_cfg.get("conf_threshold", 0.7),
+        iou_threshold=det_cfg.get("iou_threshold", 0.5),
+    )
+
+    detector = StampDetector(model_path=det_cfg["weights"], processor=processor)
 
     pipeline = CeramicPipeline(
         encoder=encoder,

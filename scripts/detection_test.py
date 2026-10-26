@@ -25,7 +25,7 @@ def load_processor(processor_path: str, **kwargs):
     
     processor_cls = getattr(module, class_name)
 
-    return processor_cls()
+    return processor_cls(**kwargs)
 
 
 def compute_iou(box1: np.ndarray, box2: np.ndarray) -> np.ndarray:
@@ -340,6 +340,9 @@ def main():
             continue
 
         proc_params = {k: v for k, v in model_cfg.items() if k not in ['processor', 'weights']}
+        proc_params.setdefault("conf_threshold", conf_threshold)
+        proc_params.setdefault("iou_threshold", iou_threshold)
+        proc_params.setdefault("imgsz", imgsz)
         processor = load_processor(processor_path, **proc_params)
 
         print(f"\nЗапуск модели: {name}")
@@ -364,17 +367,13 @@ def main():
             image_np, target = dataset[idx]
 
             t0 = time.perf_counter()
-            blob, metadata = processor.preprocess(
-                image_np, target_size=(imgsz, imgsz)
-            )
+            blob, metadata = processor.preprocess(image_np)
 
             raw_outputs = session.run([output_name], {input_name: blob})
 
             pred_boxes, pred_scores = processor.postprocess(
                 output=raw_outputs,
                 metadata=metadata,
-                conf_threshold=conf_threshold,
-                iou_threshold=iou_threshold,
             )
             latencies.append((time.perf_counter() - t0) * 1000.0)
 

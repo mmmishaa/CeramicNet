@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import onnxruntime as ort
 
-from src.preprocessing.image import enhance_stamp_contrast, fit_square
+from src.preprocessing.image import enhance_stamp_contrast
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
