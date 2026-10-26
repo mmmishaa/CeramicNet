@@ -1,0 +1,12 @@
+confidence:
+  high_confidence: 0.75
+  low_confidence: 0.3
+
+detection_model:
+  weights: "weights/detection_weights/yolo26s_v1.onnx"
+  processor: "src.detection.yolo_processing.YOLOProcessing"
+  iou_threshold: 0.5
+
+books:
+  data_path: "data/books"
+  meta_csv: "data/books/meta.csv"
