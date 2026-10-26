@@ -52,6 +52,12 @@ class CeramicPipeline:
 
         if not detect or self.detector is None:
             height, width = image.shape[:2]
+            full_crop = crop_stamp(
+                image=image,
+                box=(0.0, 0.0, float(width), float(height)),
+                padding_ratio=0.0,
+                target_size=self.target_size,
+            )
             return {
                 "image": str(image_path),
                 "top_k": k,
@@ -59,7 +65,7 @@ class CeramicPipeline:
                     {
                         "box": [0.0, 0.0, float(width), float(height)],
                         "score": None,
-                        "matches": self._retrieve(image, top_k=k),
+                        "matches": self._retrieve(full_crop, top_k=k),
                     }
                 ],
             }

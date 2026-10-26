@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from src.preprocessing.crop import crop_stamp
-from src.preprocessing.image import fit_square, read_bgr
+from src.preprocessing.image import read_bgr
 
 
 def render_preview(result: dict, target_size: int, output_path: Path) -> Path:
@@ -39,7 +39,13 @@ def render_preview(result: dict, target_size: int, output_path: Path) -> Path:
         axes[0].axis("off")
 
         if box is None or score is None:
-            crop_bgr = fit_square(image_bgr, target_size)
+            height, width = image_bgr.shape[:2]
+            crop_bgr = crop_stamp(
+                image=image_bgr,
+                box=(0.0, 0.0, float(width), float(height)),
+                padding_ratio=0.0,
+                target_size=target_size,
+            )
         else:
             crop_bgr = crop_stamp(image_bgr, box, target_size=target_size)
 

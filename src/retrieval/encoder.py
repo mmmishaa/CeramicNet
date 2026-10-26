@@ -86,13 +86,21 @@ class StampEncoder:
         return np.concatenate(parts, axis=0)
 
     def _prepare(self, image: np.ndarray) -> np.ndarray:
-        if image.ndim != 3 or image.shape[2] != 3 or min(image.shape[:2]) < 1:
+        if image.ndim != 3 or image.shape[2] != 3:
             raise ValueError(f"Ожидался цветной кадр HWC, получено: {image.shape}")
 
-        square = fit_square(image, self.input_size)
+        height, width = image.shape[:2]
+        if height != self.input_size or width != self.input_size:
+            raise ValueError(
+                f"Изображение должно быть подготовлено в размер {self.input_size}x{self.input_size}, "
+                f"получено: {height}x{width}"
+            )
+
+        prepared = image
         if self.enhance_contrast:
-            square = enhance_stamp_contrast(square)
-        rgb = square[:, :, ::-1]
+            prepared = enhance_stamp_contrast(prepared)
+
+        rgb = prepared[:, :, ::-1]
         if self.uint8_input:
             tensor = rgb if not self.channels_first else rgb.transpose(2, 0, 1)
             return np.ascontiguousarray(tensor)
