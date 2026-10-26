@@ -7,7 +7,7 @@ import yaml
 from src.detection.detector import StampDetector
 from src.paths import CONFIGS_DIR, DATA_DIR, REPORTS_DIR
 from src.pipeline import CeramicPipeline
-from src.retrieval.books import project_path, resolve_reference
+from src.retrieval.books import project_path
 from src.retrieval.encoder import StampEncoder
 from src.retrieval.index import StampIndex
 from src.retrieval.preview import open_preview, render_preview
@@ -110,18 +110,19 @@ def main() -> None:
     ret_cfg = load_yaml(args.retrieval_config)
     det_cfg = load_yaml(args.detection_config)
 
-    books_path, _ = resolve_reference(
-        books_dir=ret_cfg.get("books", {}).get("dir"),
-        meta_csv=ret_cfg.get("books", {}).get("meta_csv"),
-    )
-
     encoder = StampEncoder.from_mapping(
         ret_cfg["encoder"],
         weights=project_path(ret_cfg["encoder"]["weights"]),
     )
 
     index_path = project_path(ret_cfg["index"]["path"])
-    index = StampIndex.load(index_path, books_dir=books_path)
+    books_dir = (ret_cfg.get("books") or {}).get("dir")
+    # Пустой dir: пути к книжным сканам остаются теми, что записаны в индексе.
+    # Так же индекс читает ноутбук stamps_metrics.
+    index = StampIndex.load(
+        index_path,
+        books_dir=project_path(books_dir) if books_dir else None,
+    )
 
     top_k = args.top_k if args.top_k is not None else int(ret_cfg.get("top_k", 3))
 

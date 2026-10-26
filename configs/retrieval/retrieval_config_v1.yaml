@@ -1,0 +1,28 @@
+# Как на top3_experiments: последняя эпоха Barlow v3 и CLAHE.
+# Ноутбук stamps_metrics читает этот файл.
+# Ч/б BT.601 и нормировка ImageNet уже внутри student_encoder.onnx.
+top_k: 15
+
+confidence_config:
+  conf_threshold: 0.75
+  iou_threshold: 0.5
+
+encoder:
+  weights: "weights/finetuned_v3/student_encoder.onnx"
+  input_size: 224
+  mean: [0.0, 0.0, 0.0]
+  std: [1.0, 1.0, 1.0]
+  num_threads: 4
+  enhance_contrast: true
+
+index:
+  path: "weights/finetuned_v3/books_index.npz"
+
+books:
+  dir:
+  meta_csv:
+
+detector:
+  weights: "weights/detection_weights/yolo26s_v2.onnx"
+  imgsz: 640
+  processor: "src.detection.yolo_processing.YOLOProcessing"

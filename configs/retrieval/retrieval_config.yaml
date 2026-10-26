@@ -1,15 +1,19 @@
-top_k: 3
+# Как на top3_experiments: последняя эпоха Barlow v3 и CLAHE.
+# Ч/б BT.601 и нормировка ImageNet уже внутри student_encoder.onnx,
+# поэтому здесь картинка только переводится в диапазон 0..1.
+top_k: 15
 
 encoder:
-  weights: "weights/retrieval_weights/student_encoder.onnx"
+  weights: "weights/finetuned_v3/student_encoder.onnx"
   input_size: 224
-  mean: [0.485, 0.456, 0.406]
-  std: [0.229, 0.224, 0.225]
+  mean: [0.0, 0.0, 0.0]
+  std: [1.0, 1.0, 1.0]
   num_threads: 4
+  enhance_contrast: true
 
 index:
-  path: "data/books_index.npz"
+  path: "weights/finetuned_v3/books_index.npz"
 
 books:
-  dir: "data/books"
-  meta_csv: "data/books/meta.csv"
+  dir:
+  meta_csv:
