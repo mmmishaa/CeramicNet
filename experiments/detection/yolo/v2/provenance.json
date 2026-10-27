@@ -10,13 +10,6 @@
   "training_history_source": "ClearML numeric scalars, full available precision",
   "iteration_mapping": "0..49 -> training epochs 1..50; metrics at iteration 50 are a separate best.pt validation",
   "images": {
-    "predictions_examples.png": {
-      "source": "notebook output",
-      "cell_index": 4,
-      "output_index": 1,
-      "sha256": "8ce9e100bb3d5ca0cf090dc5f1c16c287462a189998b1b45b4b3de4dddca28c0",
-      "confidence": 0.25
-    },
     "ultralytics_results.png": {
       "source": "notebook output",
       "cell_index": 3,
@@ -46,11 +39,21 @@
       "cell_index": 3,
       "output_index": 11,
       "sha256": "56e02f9a56e061167882b1c0b8bf9007a2c0807c01afd9366dea7713122f4ef6"
+    },
+    "notebook_examples.png": {
+      "source": "notebook output",
+      "cell_index": 4,
+      "output_index": 1,
+      "sha256": "8ce9e100bb3d5ca0cf090dc5f1c16c287462a189998b1b45b4b3de4dddca28c0",
+      "confidence": 0.25
     }
   },
   "missing_for_exact_reproduction": [
     "Original results.csv and args.yaml",
     "Exact train/val membership and annotation hashes",
     "Version of the Kaggle dataset"
-  ]
+  ],
+  "selected_examples_manifest": "../../selected_images.json",
+  "dataset_snapshot_sha256": "2908cad99ce3e6909b5fbe604b4a0808bd4c793576a78425f0acc07803dc30e8",
+  "dataset_source_manifest": "../../dataset_source.json"
 }

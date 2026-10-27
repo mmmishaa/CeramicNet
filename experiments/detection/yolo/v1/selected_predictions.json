@@ -1,0 +1,380 @@
+{
+  "model": "yolo_v1",
+  "sha256": "3fd434afcd5e746041cba04efb89526f08f2f9341ac921b21104b1ae1d447411",
+  "confidence_threshold": 0.75,
+  "nms_iou": 0.5,
+  "drive_file_id": "1-NEz6W8GW8Jg1znwl14xniAKGamDify9",
+  "purpose": "qualitative illustrations; not a test evaluation",
+  "ground_truth": "RTMDet v3 annotations",
+  "records": [
+    {
+      "name": "БП12-Г01-3414_6",
+      "image_sha256": "0d4a363c75881e18fb5e157b8e2401fa5d3e9637cdc411914c1941a2a7dcfdfd",
+      "rtmdet_split": "train",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [
+        [
+          365.7168884277344,
+          112.5396957397461,
+          424.35955810546875,
+          238.04173278808594
+        ]
+      ],
+      "scores": [
+        0.8764154314994812
+      ]
+    },
+    {
+      "name": "БП12-Г01-5845_5",
+      "image_sha256": "4372620c4b9475a5f5f2744483df457de46ed336f423796d843ed8b163f401e3",
+      "rtmdet_split": "train",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [
+        [
+          348.3497009277344,
+          195.51283264160156,
+          441.44732666015625,
+          325.0196533203125
+        ]
+      ],
+      "scores": [
+        0.8809223175048828
+      ]
+    },
+    {
+      "name": "БП12-Г01-5848_10",
+      "image_sha256": "8a982699741d224bcdca762d554edbdcd20a58749ec8b5fca9e521f0deef8ca5",
+      "rtmdet_split": "train",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [],
+      "scores": []
+    },
+    {
+      "name": "БП12-Г01-7754_1",
+      "image_sha256": "c8e5e5086d0d5e647d9c75ff8906e7adbc42c68a6cb49c7bff5567347e5c3da6",
+      "rtmdet_split": "val",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [],
+      "scores": []
+    },
+    {
+      "name": "БП12-Т01-8070_11",
+      "image_sha256": "8500b2e19289287ffc5e6f9d1287b349ab39f32d10d27dfb86f814e68b48579b",
+      "rtmdet_split": "train",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [
+        [
+          301.03094482421875,
+          347.1902160644531,
+          426.8018493652344,
+          516.1412963867188
+        ]
+      ],
+      "scores": [
+        0.8551849126815796
+      ]
+    },
+    {
+      "name": "ВО-1л58-2017-0085_3",
+      "image_sha256": "9d0cce07232db18857ae321975947df42f76da12365b8b6d48ded58741e5a381",
+      "rtmdet_split": "train",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [
+        [
+          192.45977783203125,
+          137.69741821289062,
+          268.9005432128906,
+          211.41073608398438
+        ]
+      ],
+      "scores": [
+        0.8825234174728394
+      ]
+    },
+    {
+      "name": "ВО-1л58-2017-0095_6",
+      "image_sha256": "e064128e72c2a9a36ee6710e1e6a2cfbe5d22ca505eeb442ef1ff9b6ccec561f",
+      "rtmdet_split": "val",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [
+        [
+          22.847728729248047,
+          149.91014099121094,
+          88.7493896484375,
+          243.0281982421875
+        ]
+      ],
+      "scores": [
+        0.8468855619430542
+      ]
+    },
+    {
+      "name": "КБ-2014-Р1-0257_6",
+      "image_sha256": "87b238ffe8f3826573bdfc9cd1f92e6e2a2bd81573f0a27f4e2332bd28539ded",
+      "rtmdet_split": "train",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [
+        [
+          173.56480407714844,
+          154.95509338378906,
+          328.9387512207031,
+          326.26666259765625
+        ]
+      ],
+      "scores": [
+        0.883863627910614
+      ]
+    },
+    {
+      "name": "КБ-2014-Р1-0281_5",
+      "image_sha256": "c864bd7f562c39baa7e63c00850ff118f23d370ccc04983a127aa675b5568a79",
+      "rtmdet_split": "train",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [
+        [
+          286.5729064941406,
+          29.844749450683594,
+          316.9414978027344,
+          57.190086364746094
+        ]
+      ],
+      "scores": [
+        0.8584437370300293
+      ]
+    },
+    {
+      "name": "КБ-2014-Р1-0718_2",
+      "image_sha256": "cae0df77f2d66f5e430e90595718ed9f9e8849207e77c1cc96121baae7a9ac98",
+      "rtmdet_split": "train",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [
+        [
+          193.0432891845703,
+          200.72593688964844,
+          255.76844787597656,
+          289.84051513671875
+        ]
+      ],
+      "scores": [
+        0.8608193397521973
+      ]
+    },
+    {
+      "name": "КБ-2014-Р1-0855_4",
+      "image_sha256": "65be04514f91a1dba4e43a11ebe1e3edf54e1557d4291c12c8e292578a31fca1",
+      "rtmdet_split": "train",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [
+        [
+          201.85540771484375,
+          179.6555633544922,
+          282.4004211425781,
+          224.0057373046875
+        ]
+      ],
+      "scores": [
+        0.7841415405273438
+      ]
+    },
+    {
+      "name": "КБ-2014-Р1-1185_5",
+      "image_sha256": "2351eaa057d68e5834f45c71e1102a67eaaa330726e6c8d4e8ac2d22b742f7c8",
+      "rtmdet_split": "train",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [
+        [
+          174.30831909179688,
+          161.01942443847656,
+          247.0340576171875,
+          236.0309600830078
+        ]
+      ],
+      "scores": [
+        0.8737943172454834
+      ]
+    },
+    {
+      "name": "КБ-2014-Р1-1455_5",
+      "image_sha256": "e12d7887f17f9ab4bc440c85f3fcec1f19edd96c2ed16ae2260d40e79188ac62",
+      "rtmdet_split": "train",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [
+        [
+          194.7129364013672,
+          166.8826446533203,
+          357.1355285644531,
+          333.8825988769531
+        ]
+      ],
+      "scores": [
+        0.8640362620353699
+      ]
+    },
+    {
+      "name": "КБ-2014-Р2-0597_2",
+      "image_sha256": "30d1e43d4d1f6dded383e431c7f8e6b0058292825c58b410ecaef1a27ca7f3bd",
+      "rtmdet_split": "train",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [
+        [
+          233.75059509277344,
+          299.4716796875,
+          345.08551025390625,
+          403.9931945800781
+        ],
+        [
+          360.4071350097656,
+          237.17506408691406,
+          467.8803405761719,
+          396.1721496582031
+        ]
+      ],
+      "scores": [
+        0.9019294381141663,
+        0.8584660291671753
+      ]
+    },
+    {
+      "name": "КБ-2014-Р2-0610_16",
+      "image_sha256": "2f5d2d28210969faabba07ff6be7c1db3bc4c7d06c5626ceca39237403e080a9",
+      "rtmdet_split": "train",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [],
+      "scores": []
+    },
+    {
+      "name": "КБ-2014-Р3-0049_2",
+      "image_sha256": "5f513c48ca2d6e51dae724bae0d5b4195a98d61f2007a9b38a117876fd7a7e1d",
+      "rtmdet_split": "train",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [
+        [
+          212.42076110839844,
+          107.64706420898438,
+          260.1657409667969,
+          141.1527099609375
+        ],
+        [
+          214.7646942138672,
+          150.61514282226562,
+          273.88336181640625,
+          190.19952392578125
+        ]
+      ],
+      "scores": [
+        0.8519911766052246,
+        0.845091700553894
+      ]
+    },
+    {
+      "name": "КБ-2014-Р5-0056_15",
+      "image_sha256": "e968837c5f4b9b7d0db47f05f1894b0bd4935c590aa4ffbd2fb38971ce2d48e5",
+      "rtmdet_split": "train",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [],
+      "scores": []
+    },
+    {
+      "name": "КБ-2014-Р5-0401_5",
+      "image_sha256": "ca4218057161e873423b85541bc58bbc5f5a92d7bf581438f461d0e6163a0ef3",
+      "rtmdet_split": "val",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [
+        [
+          296.07733154296875,
+          214.64401245117188,
+          363.6720886230469,
+          276.4415588378906
+        ]
+      ],
+      "scores": [
+        0.889349102973938
+      ]
+    },
+    {
+      "name": "Кроп-2013-486_5",
+      "image_sha256": "c096363a0e11ae96a4cf29b2fb4629d24762fd257348e0bd3e6a81ef3fdd428c",
+      "rtmdet_split": "train",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [
+        [
+          215.63800048828125,
+          181.67481994628906,
+          242.41845703125,
+          199.5373992919922
+        ]
+      ],
+      "scores": [
+        0.7739070653915405
+      ]
+    },
+    {
+      "name": "ЛАО-2012-М102-Ш1-020_7",
+      "image_sha256": "5f8bfaa95d2dd868fea7168ca112bc7ee149b77546c1e2d0abbdb646f0382507",
+      "rtmdet_split": "train",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [
+        [
+          170.07510375976562,
+          219.6734619140625,
+          294.0292663574219,
+          272.51385498046875
+        ]
+      ],
+      "scores": [
+        0.8366270065307617
+      ]
+    },
+    {
+      "name": "Нейш3А-2018-4913_4",
+      "image_sha256": "ec7a4cd367e9065c54e6b049fa43d3005a1a5e33caf0e850f3eabf50c8d38cc1",
+      "rtmdet_split": "val",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [
+        [
+          130.15054321289062,
+          184.59686279296875,
+          236.47239685058594,
+          245.27627563476562
+        ]
+      ],
+      "scores": [
+        0.8005955219268799
+      ]
+    },
+    {
+      "name": "Нейш3А-2018-5721_1",
+      "image_sha256": "fc4834256c87ff7431c9f93779bc2e9592dfd39aed7a9dbe0575286d3eb50504",
+      "rtmdet_split": "train",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [
+        [
+          196.6708526611328,
+          249.7738494873047,
+          265.1246032714844,
+          358.5339050292969
+        ]
+      ],
+      "scores": [
+        0.9022627472877502
+      ]
+    },
+    {
+      "name": "Нейш3А-2018-6345_13",
+      "image_sha256": "c23c569d86077c453ff50bef7fa69d3b658ff29a063985340ccd3894ae77c4ad",
+      "rtmdet_split": "train",
+      "model_training_membership": "unverified",
+      "boxes_xyxy": [
+        [
+          127.7548599243164,
+          143.31655883789062,
+          243.51388549804688,
+          242.524658203125
+        ]
+      ],
+      "scores": [
+        0.8778926730155945
+      ]
+    }
+  ]
+}

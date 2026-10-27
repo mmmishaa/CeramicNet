@@ -10,10 +10,12 @@ COCO-оценка на val. На val выбирались веса и порог
 
 ![Обучение RTMDet-s — все 50 эпох](learning_curves.png)
 
-![Сохранённые примеры детекции RTMDet-s](predictions_examples.png)
+![Выбранные примеры детекции RTMDet-s](predictions_examples.png)
 
-Confidence **0.84**; зелёные рамки — разметка, красные — детектор. Это предварительные примеры, выбранные в исходном ноутбуке.
+Четыре выбранных фото из **val**, без совпадающих предметов в train. Confidence **0.84**; зелёные рамки — разметка, красные — детектор. Показаны и пропуски. [Те же четыре фото при пороге 0.5](predictions_examples_0.5.png).
 
 [PR по порогам, IoU 0.5](precision_recall.png) · [Зависимость от порога](confidence_curves.png) · [Метрики](metrics.json) · [ClearML](https://app.clear.ml/projects/667be44d3e6345ff8c818f4a5261b3f7/tasks/7e70ead7461e4d93888f7d17e169b5ec/output/scalars)
 
 [Ноутбук обучения](train.ipynb) · [Как воспроизвести](reproduce.md) · [Источники](provenance.json).
+
+[Все 23 выбранных фото](examples/README.md) · [Проверка разбиения](../selected_images.md) · [Исходные примеры ноутбука](notebook_examples.png).

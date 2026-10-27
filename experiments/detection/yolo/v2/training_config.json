@@ -19,5 +19,8 @@
     "ultralytics": "8.4.184"
   },
   "dataset_yaml_path_from_notebook": "/kaggle/input/datasets/mishasavinov/ceramic-dataset-yolo/ceramic_dataset_yolo/data.yaml",
-  "exact_dataset_manifest_available": false
+  "exact_dataset_manifest_available": false,
+  "source_corpus_snapshot_available": true,
+  "source_corpus_snapshot_sha256": "2908cad99ce3e6909b5fbe604b4a0808bd4c793576a78425f0acc07803dc30e8",
+  "dataset_folder_url": "https://drive.google.com/drive/folders/1MiKPCtREOFUfp6PxKqZUrviIB-TUI1Un"
 }

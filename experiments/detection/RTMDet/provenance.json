@@ -27,7 +27,9 @@
     "confidence": 0.84,
     "ground_truth_color": "green",
     "prediction_color": "red",
-    "sha256": "9cfd77ff4b6ddf857bd6f2400bf49e47bcb9df7573fad7366d7c33bfe4f1423e"
+    "sha256": "9cfd77ff4b6ddf857bd6f2400bf49e47bcb9df7573fad7366d7c33bfe4f1423e",
+    "archived_file": "notebook_examples.png"
   },
-  "collected_on": "2026-10-27"
+  "collected_on": "2026-10-27",
+  "selected_examples_manifest": "../selected_images.json"
 }

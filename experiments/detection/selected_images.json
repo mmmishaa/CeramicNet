@@ -1,0 +1,510 @@
+{
+  "dataset_folder": "https://drive.google.com/drive/folders/1MiKPCtREOFUfp6PxKqZUrviIB-TUI1Un",
+  "rtmdet_protocol": "v3_seed42_reserve80_active15",
+  "split_files_sha256": {
+    "train": "d50091567252d2f28f26614ed02e6dfc614fe7a48de7b8ffc75d4c81e9462242",
+    "val": "1e413a0003ecffe4b4b3526120325f03ae7de0b1c52c6d07443c8d802e0441c1"
+  },
+  "counts": {
+    "requested": 23,
+    "rtmdet_train": 19,
+    "rtmdet_val": 4
+  },
+  "selection_rule": "All user-requested RTMDet val images; chosen before inference; no object group overlaps with RTMDet train for these four",
+  "yolo_historical_split": "unverified",
+  "models": {
+    "yolo_v1": {
+      "sha256": "3fd434afcd5e746041cba04efb89526f08f2f9341ac921b21104b1ae1d447411",
+      "confidence_threshold": 0.75,
+      "nms_iou": 0.5,
+      "drive_file_id": "1-NEz6W8GW8Jg1znwl14xniAKGamDify9"
+    },
+    "yolo_v2": {
+      "sha256": "fde5f2d04931b894a12720f37ab92315219b4a0aaa649d905e58d2a5fa31925c",
+      "confidence_threshold": 0.75,
+      "nms_iou": 0.5,
+      "drive_file_id": "1lHouaTPPYgbLMLGpHxYmQiSxVIfvv8Gf"
+    },
+    "rtmdet_s": {
+      "sha256": "909b902845053b692bde6287c7b6c692936bc51773738a3c11d0699dba3216fb",
+      "confidence_threshold": 0.84,
+      "nms_iou": 0.65,
+      "drive_file_id": null
+    }
+  },
+  "images": [
+    {
+      "name": "БП12-Г01-3414_6",
+      "file_name": "stamps/БП12-Г01-3414_6.png",
+      "image_id": 3,
+      "width": 480,
+      "height": 404,
+      "sha256": "0d4a363c75881e18fb5e157b8e2401fa5d3e9637cdc411914c1941a2a7dcfdfd",
+      "group_id": "БП12-Г01-3414",
+      "rtmdet_split": "train",
+      "object_group_seen_in_rtmdet_train": true,
+      "use_in_readme": false,
+      "ground_truth_xywh": [
+        [
+          366.67,
+          116.72,
+          57.9,
+          120.28
+        ]
+      ]
+    },
+    {
+      "name": "БП12-Г01-5845_5",
+      "file_name": "stamps/БП12-Г01-5845_5.png",
+      "image_id": 8,
+      "width": 480,
+      "height": 587,
+      "sha256": "4372620c4b9475a5f5f2744483df457de46ed336f423796d843ed8b163f401e3",
+      "group_id": "БП12-Г01-5845",
+      "rtmdet_split": "train",
+      "object_group_seen_in_rtmdet_train": true,
+      "use_in_readme": false,
+      "ground_truth_xywh": [
+        [
+          351.07,
+          195.31,
+          81.63,
+          132.79
+        ]
+      ]
+    },
+    {
+      "name": "БП12-Г01-5848_10",
+      "file_name": "stamps/БП12-Г01-5848_10.png",
+      "image_id": 9,
+      "width": 480,
+      "height": 604,
+      "sha256": "8a982699741d224bcdca762d554edbdcd20a58749ec8b5fca9e521f0deef8ca5",
+      "group_id": "БП12-Г01-5848",
+      "rtmdet_split": "train",
+      "object_group_seen_in_rtmdet_train": true,
+      "use_in_readme": false,
+      "ground_truth_xywh": [
+        [
+          344.05,
+          290.74,
+          48.36,
+          51.29
+        ]
+      ]
+    },
+    {
+      "name": "БП12-Г01-7754_1",
+      "file_name": "stamps/БП12-Г01-7754_1.png",
+      "image_id": 11,
+      "width": 480,
+      "height": 539,
+      "sha256": "c8e5e5086d0d5e647d9c75ff8906e7adbc42c68a6cb49c7bff5567347e5c3da6",
+      "group_id": "БП12-Г01-7754",
+      "rtmdet_split": "val",
+      "object_group_seen_in_rtmdet_train": false,
+      "use_in_readme": true,
+      "ground_truth_xywh": [
+        [
+          207.83,
+          297.93,
+          44.3,
+          38.7
+        ]
+      ]
+    },
+    {
+      "name": "БП12-Т01-8070_11",
+      "file_name": "stamps/БП12-Т01-8070_11.png",
+      "image_id": 13,
+      "width": 480,
+      "height": 567,
+      "sha256": "8500b2e19289287ffc5e6f9d1287b349ab39f32d10d27dfb86f814e68b48579b",
+      "group_id": "БП12-Т01-8070",
+      "rtmdet_split": "train",
+      "object_group_seen_in_rtmdet_train": true,
+      "use_in_readme": false,
+      "ground_truth_xywh": [
+        [
+          302.6,
+          347.25,
+          121.04,
+          169.81
+        ]
+      ]
+    },
+    {
+      "name": "ВО-1л58-2017-0085_3",
+      "file_name": "stamps/ВО-1л58-2017-0085_3.png",
+      "image_id": 15,
+      "width": 480,
+      "height": 312,
+      "sha256": "9d0cce07232db18857ae321975947df42f76da12365b8b6d48ded58741e5a381",
+      "group_id": "ВО-1л58-2017-0085",
+      "rtmdet_split": "train",
+      "object_group_seen_in_rtmdet_train": true,
+      "use_in_readme": false,
+      "ground_truth_xywh": [
+        [
+          192.61,
+          138.1,
+          74.81,
+          72.97
+        ]
+      ]
+    },
+    {
+      "name": "ВО-1л58-2017-0095_6",
+      "file_name": "stamps/ВО-1л58-2017-0095_6.png",
+      "image_id": 17,
+      "width": 480,
+      "height": 323,
+      "sha256": "e064128e72c2a9a36ee6710e1e6a2cfbe5d22ca505eeb442ef1ff9b6ccec561f",
+      "group_id": "ВО-1л58-2017-0095",
+      "rtmdet_split": "val",
+      "object_group_seen_in_rtmdet_train": false,
+      "use_in_readme": true,
+      "ground_truth_xywh": [
+        [
+          22.07,
+          153.87,
+          64.7,
+          88.68
+        ]
+      ]
+    },
+    {
+      "name": "КБ-2014-Р1-0257_6",
+      "file_name": "stamps/КБ-2014-Р1-0257_6.png",
+      "image_id": 20,
+      "width": 480,
+      "height": 443,
+      "sha256": "87b238ffe8f3826573bdfc9cd1f92e6e2a2bd81573f0a27f4e2332bd28539ded",
+      "group_id": "КБ-2014-Р1-0257",
+      "rtmdet_split": "train",
+      "object_group_seen_in_rtmdet_train": true,
+      "use_in_readme": false,
+      "ground_truth_xywh": [
+        [
+          165.01,
+          158.32,
+          161.29,
+          167.04
+        ]
+      ]
+    },
+    {
+      "name": "КБ-2014-Р1-0281_5",
+      "file_name": "stamps/КБ-2014-Р1-0281_5.png",
+      "image_id": 22,
+      "width": 480,
+      "height": 271,
+      "sha256": "c864bd7f562c39baa7e63c00850ff118f23d370ccc04983a127aa675b5568a79",
+      "group_id": "КБ-2014-Р1-0281",
+      "rtmdet_split": "train",
+      "object_group_seen_in_rtmdet_train": true,
+      "use_in_readme": false,
+      "ground_truth_xywh": [
+        [
+          287.04,
+          31.33,
+          29.42,
+          24.59
+        ]
+      ]
+    },
+    {
+      "name": "КБ-2014-Р1-0718_2",
+      "file_name": "stamps/КБ-2014-Р1-0718_2.png",
+      "image_id": 24,
+      "width": 480,
+      "height": 461,
+      "sha256": "cae0df77f2d66f5e430e90595718ed9f9e8849207e77c1cc96121baae7a9ac98",
+      "group_id": "КБ-2014-Р1-0718",
+      "rtmdet_split": "train",
+      "object_group_seen_in_rtmdet_train": true,
+      "use_in_readme": false,
+      "ground_truth_xywh": [
+        [
+          190.28,
+          202.18,
+          65.09,
+          90.52
+        ]
+      ]
+    },
+    {
+      "name": "КБ-2014-Р1-0855_4",
+      "file_name": "stamps/КБ-2014-Р1-0855_4.png",
+      "image_id": 26,
+      "width": 480,
+      "height": 501,
+      "sha256": "65be04514f91a1dba4e43a11ebe1e3edf54e1557d4291c12c8e292578a31fca1",
+      "group_id": "КБ-2014-Р1-0855",
+      "rtmdet_split": "train",
+      "object_group_seen_in_rtmdet_train": true,
+      "use_in_readme": false,
+      "ground_truth_xywh": [
+        [
+          138.9,
+          150.14,
+          100.98,
+          71.74
+        ]
+      ]
+    },
+    {
+      "name": "КБ-2014-Р1-1185_5",
+      "file_name": "stamps/КБ-2014-Р1-1185_5.png",
+      "image_id": 28,
+      "width": 480,
+      "height": 398,
+      "sha256": "2351eaa057d68e5834f45c71e1102a67eaaa330726e6c8d4e8ac2d22b742f7c8",
+      "group_id": "КБ-2014-Р1-1185",
+      "rtmdet_split": "train",
+      "object_group_seen_in_rtmdet_train": true,
+      "use_in_readme": false,
+      "ground_truth_xywh": [
+        [
+          176.24,
+          167.51,
+          70.01,
+          69.14
+        ]
+      ]
+    },
+    {
+      "name": "КБ-2014-Р1-1455_5",
+      "file_name": "stamps/КБ-2014-Р1-1455_5.png",
+      "image_id": 30,
+      "width": 480,
+      "height": 406,
+      "sha256": "e12d7887f17f9ab4bc440c85f3fcec1f19edd96c2ed16ae2260d40e79188ac62",
+      "group_id": "КБ-2014-Р1-1455",
+      "rtmdet_split": "train",
+      "object_group_seen_in_rtmdet_train": true,
+      "use_in_readme": false,
+      "ground_truth_xywh": [
+        [
+          193.05,
+          165.75,
+          165.26,
+          166.34
+        ]
+      ]
+    },
+    {
+      "name": "КБ-2014-Р2-0597_2",
+      "file_name": "stamps/КБ-2014-Р2-0597_2.png",
+      "image_id": 40,
+      "width": 480,
+      "height": 490,
+      "sha256": "30d1e43d4d1f6dded383e431c7f8e6b0058292825c58b410ecaef1a27ca7f3bd",
+      "group_id": "КБ-2014-Р2-0597",
+      "rtmdet_split": "train",
+      "object_group_seen_in_rtmdet_train": true,
+      "use_in_readme": false,
+      "ground_truth_xywh": [
+        [
+          233.59,
+          299.7,
+          110.78,
+          104.4
+        ],
+        [
+          359.29,
+          238.63,
+          107.23,
+          156.23
+        ]
+      ]
+    },
+    {
+      "name": "КБ-2014-Р2-0610_16",
+      "file_name": "stamps/КБ-2014-Р2-0610_16.png",
+      "image_id": 42,
+      "width": 480,
+      "height": 435,
+      "sha256": "2f5d2d28210969faabba07ff6be7c1db3bc4c7d06c5626ceca39237403e080a9",
+      "group_id": "КБ-2014-Р2-0610",
+      "rtmdet_split": "train",
+      "object_group_seen_in_rtmdet_train": true,
+      "use_in_readme": false,
+      "ground_truth_xywh": [
+        [
+          232.43,
+          235.13,
+          39.2,
+          31.0
+        ]
+      ]
+    },
+    {
+      "name": "КБ-2014-Р3-0049_2",
+      "file_name": "stamps/КБ-2014-Р3-0049_2.png",
+      "image_id": 57,
+      "width": 480,
+      "height": 272,
+      "sha256": "5f513c48ca2d6e51dae724bae0d5b4195a98d61f2007a9b38a117876fd7a7e1d",
+      "group_id": "КБ-2014-Р3-0049",
+      "rtmdet_split": "train",
+      "object_group_seen_in_rtmdet_train": true,
+      "use_in_readme": false,
+      "ground_truth_xywh": [
+        [
+          209.86,
+          105.86,
+          49.74,
+          36.09
+        ],
+        [
+          213.82,
+          150.31,
+          58.98,
+          40.5
+        ]
+      ]
+    },
+    {
+      "name": "КБ-2014-Р5-0056_15",
+      "file_name": "stamps/КБ-2014-Р5-0056_15.png",
+      "image_id": 87,
+      "width": 480,
+      "height": 241,
+      "sha256": "e968837c5f4b9b7d0db47f05f1894b0bd4935c590aa4ffbd2fb38971ce2d48e5",
+      "group_id": "КБ-2014-Р5-0056",
+      "rtmdet_split": "train",
+      "object_group_seen_in_rtmdet_train": true,
+      "use_in_readme": false,
+      "ground_truth_xywh": [
+        [
+          137.98,
+          97.21,
+          219.01,
+          56.94
+        ]
+      ]
+    },
+    {
+      "name": "КБ-2014-Р5-0401_5",
+      "file_name": "stamps/КБ-2014-Р5-0401_5.png",
+      "image_id": 106,
+      "width": 480,
+      "height": 343,
+      "sha256": "ca4218057161e873423b85541bc58bbc5f5a92d7bf581438f461d0e6163a0ef3",
+      "group_id": "КБ-2014-Р5-0401",
+      "rtmdet_split": "val",
+      "object_group_seen_in_rtmdet_train": false,
+      "use_in_readme": true,
+      "ground_truth_xywh": [
+        [
+          296.7,
+          215.0,
+          66.6,
+          61.1
+        ]
+      ]
+    },
+    {
+      "name": "Кроп-2013-486_5",
+      "file_name": "stamps/Кроп-2013-486_5.png",
+      "image_id": 113,
+      "width": 480,
+      "height": 317,
+      "sha256": "c096363a0e11ae96a4cf29b2fb4629d24762fd257348e0bd3e6a81ef3fdd428c",
+      "group_id": "Кроп-2013-486",
+      "rtmdet_split": "train",
+      "object_group_seen_in_rtmdet_train": true,
+      "use_in_readme": false,
+      "ground_truth_xywh": [
+        [
+          215.37,
+          181.8,
+          26.93,
+          16.8
+        ]
+      ]
+    },
+    {
+      "name": "ЛАО-2012-М102-Ш1-020_7",
+      "file_name": "stamps/ЛАО-2012-М102-Ш1-020_7.png",
+      "image_id": 116,
+      "width": 480,
+      "height": 466,
+      "sha256": "5f8bfaa95d2dd868fea7168ca112bc7ee149b77546c1e2d0abbdb646f0382507",
+      "group_id": "ЛАО-2012-М102-Ш1-020",
+      "rtmdet_split": "train",
+      "object_group_seen_in_rtmdet_train": true,
+      "use_in_readme": false,
+      "ground_truth_xywh": [
+        [
+          203.6,
+          223.3,
+          92.4,
+          48.8
+        ]
+      ]
+    },
+    {
+      "name": "Нейш3А-2018-4913_4",
+      "file_name": "stamps/Нейш3А-2018-4913_4.png",
+      "image_id": 124,
+      "width": 480,
+      "height": 267,
+      "sha256": "ec7a4cd367e9065c54e6b049fa43d3005a1a5e33caf0e850f3eabf50c8d38cc1",
+      "group_id": "Нейш3А-2018-4913",
+      "rtmdet_split": "val",
+      "object_group_seen_in_rtmdet_train": false,
+      "use_in_readme": true,
+      "ground_truth_xywh": [
+        [
+          128.39,
+          185.4,
+          110.91,
+          60.9
+        ]
+      ]
+    },
+    {
+      "name": "Нейш3А-2018-5721_1",
+      "file_name": "stamps/Нейш3А-2018-5721_1.png",
+      "image_id": 151,
+      "width": 480,
+      "height": 377,
+      "sha256": "fc4834256c87ff7431c9f93779bc2e9592dfd39aed7a9dbe0575286d3eb50504",
+      "group_id": "Нейш3А-2018-5721",
+      "rtmdet_split": "train",
+      "object_group_seen_in_rtmdet_train": true,
+      "use_in_readme": false,
+      "ground_truth_xywh": [
+        [
+          196.8,
+          248.5,
+          68.7,
+          109.3
+        ]
+      ]
+    },
+    {
+      "name": "Нейш3А-2018-6345_13",
+      "file_name": "stamps/Нейш3А-2018-6345_13.png",
+      "image_id": 155,
+      "width": 480,
+      "height": 389,
+      "sha256": "c23c569d86077c453ff50bef7fa69d3b658ff29a063985340ccd3894ae77c4ad",
+      "group_id": "Нейш3А-2018-6345",
+      "rtmdet_split": "train",
+      "object_group_seen_in_rtmdet_train": true,
+      "use_in_readme": false,
+      "ground_truth_xywh": [
+        [
+          127.6,
+          139.99,
+          115.01,
+          105.06
+        ]
+      ]
+    }
+  ],
+  "dataset_snapshot_sha256": "2908cad99ce3e6909b5fbe604b4a0808bd4c793576a78425f0acc07803dc30e8"
+}
