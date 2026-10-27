@@ -1,0 +1,60 @@
+{
+  "model": "rtmdet_s",
+  "augmentation": "light",
+  "augmentation_operations": [
+    {
+      "type": "Brightness",
+      "p": 0.5,
+      "factor": [
+        0.85,
+        1.15
+      ]
+    },
+    {
+      "type": "LowContrast",
+      "p": 0.15,
+      "factor": [
+        0.8,
+        1.0
+      ]
+    },
+    {
+      "type": "HighContrast",
+      "p": 0.15,
+      "factor": [
+        1.0,
+        1.2
+      ]
+    },
+    {
+      "type": "Grayscale",
+      "p": 0.1
+    }
+  ],
+  "seed": 42,
+  "epochs": 50,
+  "batch_size": 2,
+  "pretraining": "COCO detector; new one-class classification layers",
+  "weights_url": "https://download.openmmlab.com/mmdetection/v3.0/rtmdet/rtmdet_s_8xb32-300e_coco/rtmdet_s_8xb32-300e_coco_20220905_161602-387a891e.pth",
+  "weights_sha256": "387a891e157cf0ab57d76b3ffc17bf77247089d672532427930b3140f9e789d6",
+  "device": "cpu",
+  "image_size": 640,
+  "learning_rate": 3.125e-05,
+  "split_version": "v3_seed42_reserve80_active15",
+  "split_fingerprint": "eced90ae61411c4e7d05e34b9c99281b4dd91226e123a83eb7f2aaa33623a1a1",
+  "split_files_sha256": {
+    "train": "d50091567252d2f28f26614ed02e6dfc614fe7a48de7b8ffc75d4c81e9462242",
+    "val": "1e413a0003ecffe4b4b3526120325f03ae7de0b1c52c6d07443c8d802e0441c1",
+    "manifest": "8b6ee2a93537aeef6df40703050024e8e6601ba24a9dd45ba954d80950b0c454",
+    "negative_train_reserve": "5b9cc35cdef73ade58e4f582c3ec33227d4f2f1ded1c0929fccd1cffa4d6c42e",
+    "negative_unused": "5582a81d49f4f1b0c525aaa62d44168720100001e4d58ec942b31f4b5e490fcb"
+  },
+  "repository_commit": "61199ac4ebc09baa9ce15f6cd9e7e6de2c1947ac",
+  "tracking": "local",
+  "versions": {
+    "torch": "2.5.1",
+    "mmcv": "2.1.0",
+    "mmengine": "0.10.7",
+    "mmdet": "3.3.0"
+  }
+}

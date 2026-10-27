@@ -1,0 +1,33 @@
+{
+  "source_repository": "https://github.com/mmmishaa/CeramicNet",
+  "training_source_commit": "61199ac4ebc09baa9ce15f6cd9e7e6de2c1947ac",
+  "source_notebook": "train_pipelines/detection_models/RTMDet-s/rtmdet_s_train.ipynb",
+  "original_notebook_sha256": "a27322fe9e98b292d21dbf56acec0c439b07a54ce8f185108966787676ea43b5",
+  "archived_notebook_changes": [
+    "Outputs removed",
+    "Added reproduction context",
+    "Project discovery accepts CERAMIC_SOURCE_ROOT"
+  ],
+  "clearml_url": "https://app.clear.ml/projects/667be44d3e6345ff8c818f4a5261b3f7/tasks/7e70ead7461e4d93888f7d17e169b5ec/output/scalars",
+  "clearml_task_id": "7e70ead7461e4d93888f7d17e169b5ec",
+  "native_model_id": "bf0fe86f32d44493837ce11e14034b21",
+  "onnx_model_id": "4468928162ea4104b9cdfb16e8a51894",
+  "checkpoint_sha256": "aeeccbc3d7a817ae535c6a8725a1b475cc01d88af6df58f3fda5469ee0efb538",
+  "annotation_sha256": "68da0f7d1401da1f476cdcf94cb7603e43175c97aa298f84fdf27dc1b23611e1",
+  "split_files_sha256": {
+    "train": "d50091567252d2f28f26614ed02e6dfc614fe7a48de7b8ffc75d4c81e9462242",
+    "val": "1e413a0003ecffe4b4b3526120325f03ae7de0b1c52c6d07443c8d802e0441c1",
+    "manifest": "8b6ee2a93537aeef6df40703050024e8e6601ba24a9dd45ba954d80950b0c454",
+    "negative_train_reserve": "5b9cc35cdef73ade58e4f582c3ec33227d4f2f1ded1c0929fccd1cffa4d6c42e",
+    "negative_unused": "5582a81d49f4f1b0c525aaa62d44168720100001e4d58ec942b31f4b5e490fcb"
+  },
+  "training_history_source": "All three native MMEngine resume segments; abandoned tails removed",
+  "examples": {
+    "source": "Saved training notebook montage",
+    "confidence": 0.84,
+    "ground_truth_color": "green",
+    "prediction_color": "red",
+    "sha256": "9cfd77ff4b6ddf857bd6f2400bf49e47bcb9df7573fad7366d7c33bfe4f1423e"
+  },
+  "collected_on": "2026-10-27"
+}
