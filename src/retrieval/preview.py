@@ -102,15 +102,11 @@ def render_preview(result: dict, target_size: int, output_path: Path) -> list[Pa
 
     return saved_files
 
-
 def open_preview(path: Path) -> None:
     path = Path(path).resolve()
-    if not path.is_file():
-        return
-
     system = platform.system()
     if system == "Windows":
-        os.startfile(str(path))
+        subprocess.Popen(["explorer.exe", str(path)])
     elif system == "Darwin":
         subprocess.Popen(["open", str(path)])
     else:
