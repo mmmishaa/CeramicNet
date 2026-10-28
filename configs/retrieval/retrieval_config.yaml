@@ -1,7 +1,7 @@
 top_k: 10
 
 encoder:
-  weights: "weights/retrieval_weights/student_encoder.onnx"
+  weights: "weights/retrieval_weights/stamp_encoder.onnx"
   input_size: 224
   mean: [0.0, 0.0, 0.0]
   std: [1.0, 1.0, 1.0]
@@ -9,7 +9,7 @@ encoder:
   enhance_contrast: true
 
 index:
-  path: "data/books_index.npz"
+  path: "data/stamp_books_index.npz"
 
 books:
   dir: "data/books"
