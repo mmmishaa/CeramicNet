@@ -149,11 +149,12 @@ def main() -> None:
                 )
 
         preview_path = REPORTS_DIR / f"result_{image_path.stem}.png"
-        render_preview(result, target_size=pipeline.target_size, output_path=preview_path)
-        print(f"Preview saved to: {preview_path}")
+        saved_previews = render_preview(result, target_size=pipeline.target_size, output_path=preview_path)
 
-        if args.show:
-            open_preview(preview_path)
+        for p in saved_previews:
+            print(f"Preview saved to: {p}")
+            if args.show:
+                open_preview(p)
 
 if __name__ == "__main__":
     main()
