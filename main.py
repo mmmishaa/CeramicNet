@@ -17,14 +17,15 @@ from src.utils import load_yaml
 
 VALID_EXTENSIONS = {".jpg", ".png"}
 
-def get_random_image(images_dir: Path) -> Path:
+def get_random_images(images_dir: Path, count: int = 1) -> List[Path]:
     candidates = [
         path for path in images_dir.iterdir()
         if path.is_file() and path.suffix.lower() in VALID_EXTENSIONS
     ]
     if not candidates:
         raise FileNotFoundError(f"No valid images found in: {images_dir}")
-    return random.choice(candidates)
+    num_to_take = min(count, len(candidates))
+    return random.sample(candidates, num_to_take)
 
 def resolve_image_paths(input_path: Path) -> List[Path]:
     if input_path.is_file():
@@ -52,8 +53,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--random",
-        action="store_true",
-        help="Pick a random image from the dataset",
+        nargs="?",
+        const=1,
+        type=int,
+        default=None,
+        help="Pick N random images from the dataset (default: 1 if flag is passed without value)",
     )
     parser.add_argument(
         "--retrieval-config",
@@ -76,8 +80,11 @@ def main() -> None:
 
     dataset_images_dir = DATA_DIR / "ceramic_dataset" / "images"
 
-    if args.random or args.input is None:
-        target_images = [get_random_image(dataset_images_dir)]
+    if args.random is not None:
+        target_images = get_random_images(dataset_images_dir, count=args.random)
+        print(f"Selected {len(target_images)} random image(s): {[img.name for img in target_images]}")
+    elif args.input is None:
+        target_images = get_random_images(dataset_images_dir, count=1)
         print(f"Selected random image: {target_images[0].name}")
     else:
         resolved_path = project_path(args.input)
