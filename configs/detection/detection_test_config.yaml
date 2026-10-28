@@ -20,3 +20,8 @@ detectors:
     weights: "weights/detection_weights/yolo26s_v2.onnx"
     imgsz: 640
     processor: "src.detection.yolo_processing.YOLOProcessing"
+
+  rtmdet:
+    weights: "weights/detection_weights/rtmdet.onnx"
+    imgsz: 640
+    processor: "src.detection.rtmdet_processing.RTMDetProcessing"

@@ -1,14 +1,8 @@
-"""Processing for the one-class RTMDet-s ONNX exported by CeramicNet.
-
-Input: BGR float32 [1, 3, 640, 640], values 0..255; normalization is in
-the graph. Output: [1, N, 5], decoded xyxy boxes followed by probability.
-"""
 import cv2
 import numpy as np
 
 
 class RTMDetProcessing:
-    """The same processor interface as YOLOProcessing, with RTMDet geometry."""
 
     def __init__(self, imgsz: int = 640, conf_threshold: float = 0.5,
                  iou_threshold: float = 0.65):
