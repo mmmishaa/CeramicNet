@@ -47,7 +47,12 @@ def render_preview(result: dict, target_size: int, output_path: Path) -> Path:
                 target_size=target_size,
             )
         else:
-            crop_bgr = crop_stamp(image_bgr, box, target_size=target_size)
+            crop_bgr = crop_stamp(
+                image_bgr,
+                box,
+                padding_ratio=0.0,
+                target_size=target_size,
+            )
 
         crop_rgb = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2RGB)
         axes[1].imshow(crop_rgb)

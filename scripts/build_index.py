@@ -3,7 +3,7 @@ import argparse
 import numpy as np
 from tqdm import tqdm
 
-from src.preprocessing.image import read_bgr
+from src.preprocessing.image import fit_square, read_bgr
 from src.retrieval.books import (
     load_book_records,
     load_retrieval_config,
@@ -79,7 +79,8 @@ def main():
 
     progress = tqdm(records, desc="Эмбеддинги books", unit="mark")
     for record in progress:
-        batch.append(read_bgr(books_dir / record["image_path"]))
+        image = read_bgr(books_dir / record["image_path"])
+        batch.append(fit_square(image, encoder.input_size))
         if len(batch) == args.batch_size:
             vectors.append(encoder.embed_many(batch))
             batch = []

@@ -142,6 +142,50 @@ def load_real_crops(coco_dir: Path | None = None) -> list[RealSample]:
     return samples
 
 
+_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff", ".bmp"}
+
+
+def load_detected_crops(photos_dir: Path, weights: Path, conf: float = 0.75) -> list[RealSample]:
+    """Кропы полевых фото: боксы ставит YOLO, в обучение идёт каждый бокс выше порога."""
+    from src.detection.detector import StampDetector
+    from src.detection.yolo_processing import YOLOProcessing
+
+    if not photos_dir.is_dir():
+        raise FileNotFoundError(f"Папка фото не найдена: {photos_dir}")
+    if not weights.is_file():
+        raise FileNotFoundError(f"Веса детектора не найдены: {weights}")
+    if not 0.0 < conf < 1.0:
+        raise ValueError(f"Порог детектора должен быть в (0, 1), получено {conf}")
+
+    images = sorted(
+        path
+        for path in photos_dir.rglob("*")
+        if path.is_file() and path.suffix.lower() in _IMAGE_SUFFIXES
+    )
+    if not images:
+        raise ValueError(f"В {photos_dir} нет изображений")
+
+    detector = StampDetector(weights, YOLOProcessing(conf_threshold=conf))
+    samples: list[RealSample] = []
+    empty = 0
+    for path in images:
+        boxes, _scores = detector.predict(read_bgr(path))
+        if len(boxes) == 0:
+            empty += 1
+            continue
+        relative = path.relative_to(photos_dir).as_posix()
+        for index, box in enumerate(boxes):
+            x1, y1, x2, y2 = (float(value) for value in box)
+            if x2 - x1 <= 1 or y2 - y1 <= 1:
+                continue
+            name = relative if index == 0 else f"{relative}#{index}"
+            samples.append(RealSample(path=path, box=(x1, y1, x2, y2), file_name=name))
+    print(f"YOLO: {len(samples)} кропов из {len(images)} фото, без клейма {empty}")
+    if len(samples) < 2:
+        raise ValueError(f"Детектор нашёл меньше двух кропов в {photos_dir}")
+    return samples
+
+
 def _to_pil(image_bgr: np.ndarray) -> Image.Image:
     rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
     return Image.fromarray(rgb)
@@ -167,7 +211,7 @@ def square_tensor(path: Path) -> torch.Tensor:
 
 
 class GaussianNoise:
-    """Лёгкий шум для реальных кропов. Кроп и сильное размытие сюда не входят."""
+    """Лёгкий шум. Вторая обрезка кропа сюда не входит."""
 
     def __init__(self, std: float = 0.02) -> None:
         self.std = std
@@ -177,41 +221,97 @@ class GaussianNoise:
 
 
 def book_transform() -> transforms.Compose:
-    """Поворот 0..180°, мягкий кроп со сдвигом окна и лёгкое размытие.
+    """Поворот, лёгкая гомография, цвет, квадратный кроп, размытие и шум.
 
-    scale от 0.75 сохраняет мелкие детали клейма. Размытие срабатывает с вероятностью 0.3.
+    Окно кропа квадратное: после ресайза к 224 пропорции клейма не тянутся.
+    Гомография слабая, только чтобы страница была снята не строго сверху.
     """
     return transforms.Compose(
         [
             transforms.RandomRotation(degrees=(0, 180), fill=114),
+            transforms.RandomPerspective(distortion_scale=0.2, p=0.5, fill=114),
+            transforms.RandomApply(
+                [transforms.ColorJitter(brightness=0.4, contrast=0.4)],
+                p=0.8,
+            ),
+            transforms.RandomAutocontrast(p=0.3),
             transforms.RandomResizedCrop(
                 INPUT_SIZE,
                 scale=(0.75, 1.0),
-                ratio=(0.75, 1.333),
+                ratio=(1.0, 1.0),
                 interpolation=transforms.InterpolationMode.BILINEAR,
             ),
             transforms.RandomApply(
-                [transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 1.0))],
-                p=0.3,
+                [transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 1.2))],
+                p=0.4,
             ),
             transforms.ToTensor(),
+            transforms.RandomApply([GaussianNoise(std=0.02)], p=0.5),
         ]
     )
 
 
 def real_transform() -> transforms.Compose:
-    """Полный поворот тарелки, лёгкий цвет и шум. Кропа и размытия нет.
+    """Поворот тарелки, лёгкая гомография, цвет, шум и слабое размытие.
 
-    Полевой кроп и так частичный, вторая обрезка срезает клеймо.
+    Случайного кропа нет: полевой бокс и так часто срезает клеймо.
+    Гомография не меняет пропорции сильно: distortion_scale 0.15.
     """
     return transforms.Compose(
         [
             transforms.RandomRotation(degrees=(0, 360), fill=114),
-            transforms.ColorJitter(brightness=0.4, contrast=0.4),
+            transforms.RandomPerspective(distortion_scale=0.15, p=0.4, fill=114),
+            transforms.ColorJitter(brightness=0.45, contrast=0.45),
+            transforms.RandomApply(
+                [transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 0.8))],
+                p=0.3,
+            ),
             transforms.ToTensor(),
             GaussianNoise(std=0.02),
         ]
     )
+
+
+def hard_negative_batches(
+    embeddings: torch.Tensor,
+    batch_size: int,
+    neighbors: int,
+    generator: torch.Generator,
+) -> list[list[int]]:
+    """Батчи, где клеймо лежит рядом со своими ближайшими чужими.
+
+    Берём случайное ещё не использованное клеймо и добавляем к нему
+    neighbors ближайших, тоже не использованных. ArcFace в одном батче
+    видит именно те пары, которые путает поиск.
+    """
+    count = embeddings.shape[0]
+    normalized = torch.nn.functional.normalize(embeddings.float(), dim=-1)
+    similarity = normalized @ normalized.T
+    similarity.fill_diagonal_(-2.0)
+    ranked = torch.argsort(similarity, dim=1, descending=True)
+
+    unused = torch.ones(count, dtype=torch.bool)
+    order = torch.randperm(count, generator=generator).tolist()
+    batches: list[list[int]] = []
+    current: list[int] = []
+    for seed in order:
+        if not unused[seed]:
+            continue
+        group = [seed]
+        unused[seed] = False
+        for neighbor in ranked[seed].tolist():
+            if len(group) > neighbors:
+                break
+            if unused[neighbor]:
+                group.append(neighbor)
+                unused[neighbor] = False
+        current.extend(group)
+        if len(current) >= batch_size:
+            batches.append(current[:batch_size])
+            current = current[batch_size:]
+    if len(current) >= 2:
+        batches.append(current)
+    return batches
 
 
 class BookPairDataset(Dataset):

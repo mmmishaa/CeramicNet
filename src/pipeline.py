@@ -32,7 +32,12 @@ class CeramicPipeline:
 
     def _preprocess(self, image: np.ndarray, boxes: np.ndarray) -> list[np.ndarray]:
         return [
-            crop_stamp(image=image, box=box, target_size=self.target_size)
+            crop_stamp(
+                image=image,
+                box=box,
+                padding_ratio=0.0,
+                target_size=self.target_size,
+            )
             for box in boxes
         ]
 
@@ -99,3 +104,4 @@ class CeramicPipeline:
             "top_k": k,
             "detections": detections,
         }
+

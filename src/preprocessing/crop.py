@@ -4,7 +4,7 @@ import numpy as np
 def crop_stamp(
     image: np.ndarray,
     box: tuple[float, float, float, float],
-    padding_ratio: float = 0.1,
+    padding_ratio: float = 0.0,
     target_size: int = 224,
 ) -> np.ndarray:
     if image is None or image.size == 0 or box is None:

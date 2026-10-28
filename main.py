@@ -66,6 +66,9 @@ def parse_args() -> argparse.Namespace:
         default=CONFIGS_DIR / "detection" / "detection_config.yaml",
     )
     parser.add_argument("--top-k", type=int, default=None)
+    parser.add_argument("--encoder", type=Path, default=None, help="ONNX энкодера")
+    parser.add_argument("--index", type=Path, default=None, help="Индекс эталона .npz")
+    parser.add_argument("--books", type=Path, default=None, help="Папка books этого индекса")
     parser.add_argument("--no-detect", action="store_true", help="Run without detector")
     parser.add_argument("--show", action="store_true", help="Display result preview")
     return parser.parse_args()
@@ -87,17 +90,23 @@ def main() -> None:
     ret_cfg = load_yaml(args.retrieval_config)
     det_cfg = load_yaml(args.detection_config)
 
-    books_path, _ = resolve_reference(
-        books_dir=ret_cfg.get("books", {}).get("dir"),
-        meta_csv=ret_cfg.get("books", {}).get("meta_csv"),
-    )
+    if args.books is not None:
+        books_path = project_path(args.books)
+        if not books_path.is_dir():
+            raise FileNotFoundError(f"Папка эталона не найдена: {books_path}")
+    else:
+        books_path, _ = resolve_reference(
+            books_dir=ret_cfg.get("books", {}).get("dir"),
+            meta_csv=ret_cfg.get("books", {}).get("meta_csv"),
+        )
 
+    encoder_weights = args.encoder or ret_cfg["encoder"]["weights"]
     encoder = StampEncoder.from_mapping(
         ret_cfg["encoder"],
-        weights=project_path(ret_cfg["encoder"]["weights"]),
+        weights=project_path(encoder_weights),
     )
 
-    index_path = project_path(ret_cfg["index"]["path"])
+    index_path = project_path(args.index or ret_cfg["index"]["path"])
     index = StampIndex.load(index_path, books_dir=books_path)
 
     top_k = args.top_k if args.top_k is not None else int(ret_cfg.get("top_k", 3))
