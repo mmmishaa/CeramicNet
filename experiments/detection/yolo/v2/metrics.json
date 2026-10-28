@@ -1,0 +1,33 @@
+{
+  "model": "YOLO26s",
+  "experiment": "v2",
+  "evaluator": "Ultralytics 8.4.184",
+  "split": "validation",
+  "validation": {
+    "images": 145,
+    "positive_images": 51,
+    "negative_images": 94,
+    "instances": 51
+  },
+  "best_checkpoint_validation": {
+    "map_50_95": 0.7021555304527283,
+    "ap50": 0.9349159598350525,
+    "precision": 0.8792991638183594,
+    "recall": 0.8571340441703796
+  },
+  "evaluations": [
+    {
+      "stage": "best_checkpoint_validation",
+      "source": "ClearML metrics at iteration 50; automatic validation of best.pt",
+      "images": 145,
+      "instances": 51,
+      "map_50_95": 0.7021555304527283,
+      "ap50": 0.9349159598350525,
+      "precision": 0.8792991638183594,
+      "recall": 0.8571340441703796
+    }
+  ],
+  "independent_test": false,
+  "comparable_across_reports": false,
+  "comparison_note": "Exact dataset membership and annotation equivalence across runs are not established."
+}

@@ -1,0 +1,30 @@
+{
+  "source_repository": "https://github.com/mmmishaa/CeramicNet",
+  "source_commit": "a9f785280a064a3b3c164a61ec8f647b22c1cf07",
+  "notebook": "notebooks/detection/yolo/yolo_v1_train_pipeline.ipynb",
+  "notebook_sha256": "3082df5758e6db05027e12a41a9f4644fbd51c8b1bdc4d8aa141c00d52aaddab",
+  "clearml_task_id": "fa3c17a1e8e544fea4628c326a4b5a3e",
+  "clearml_url": "https://app.clear.ml/projects/d6209850b8fb417bb10decb4dfaccfd8/tasks/fa3c17a1e8e544fea4628c326a4b5a3e/output/scalars",
+  "output_model_id": "898fb3065d894a9f902a35c2aac5bc0e",
+  "collected_on": "2026-10-27",
+  "training_history_source": "ClearML numeric scalars, full available precision",
+  "iteration_mapping": "0..49 -> training epochs 1..50; metrics at iteration 50 are a separate best.pt validation",
+  "images": {
+    "notebook_examples.png": {
+      "source": "notebook output",
+      "cell_index": 4,
+      "output_index": 1,
+      "sha256": "5ed40d683204756e337a85263b03ca33311218683cebf0d890556fa8da4d993b",
+      "confidence": 0.25
+    }
+  },
+  "missing_for_exact_reproduction": [
+    "Original results.csv and args.yaml",
+    "Exact train/val membership and annotation hashes",
+    "Version of the Kaggle dataset",
+    "PR/F1 images: saved notebook has none; the stored ClearML image URLs returned HTTP 404 on 2026-10-27"
+  ],
+  "selected_examples_manifest": "../../selected_images.json",
+  "dataset_snapshot_sha256": "2908cad99ce3e6909b5fbe604b4a0808bd4c793576a78425f0acc07803dc30e8",
+  "dataset_source_manifest": "../../dataset_source.json"
+}
