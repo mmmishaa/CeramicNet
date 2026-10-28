@@ -2,6 +2,7 @@ import argparse
 import importlib
 from pathlib import Path
 import random
+from typing import List
 import yaml
 
 from src.paths import CONFIGS_DIR, DATA_DIR, REPORTS_DIR
@@ -14,23 +15,40 @@ from src.retrieval.preview import open_preview, render_preview
 
 from src.utils import load_yaml
 
+VALID_EXTENSIONS = {".jpg", ".png"}
+
 def get_random_image(images_dir: Path) -> Path:
-    valid_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
     candidates = [
         path for path in images_dir.iterdir()
-        if path.is_file() and path.suffix.lower() in valid_extensions
+        if path.is_file() and path.suffix.lower() in VALID_EXTENSIONS
     ]
     if not candidates:
         raise FileNotFoundError(f"No valid images found in: {images_dir}")
     return random.choice(candidates)
 
+def resolve_image_paths(input_path: Path) -> List[Path]:
+    if input_path.is_file():
+        if input_path.suffix.lower() not in VALID_EXTENSIONS:
+            raise ValueError(f"Unsupported file format: {input_path}")
+        return [input_path]
+
+    if input_path.is_dir():
+        images = sorted(
+            [p for p in input_path.iterdir() if p.is_file() and p.suffix.lower() in VALID_EXTENSIONS]
+        )
+        if not images:
+            raise FileNotFoundError(f"No valid images found in directory: {input_path}")
+        return images
+
+    raise FileNotFoundError(f"Path not found: {input_path}")
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Test CeramicNet Pipeline")
     parser.add_argument(
-        "--image",
+        "--input",
         type=Path,
         default=None,
-        help="Path to image for inference",
+        help="Path to an image file or directory with images for inference",
     )
     parser.add_argument(
         "--random",
@@ -58,13 +76,13 @@ def main() -> None:
 
     dataset_images_dir = DATA_DIR / "ceramic_dataset" / "images"
 
-    if args.random or args.image is None:
-        image_path = get_random_image(dataset_images_dir)
-        print(f"Selected random image: {image_path.name}")
+    if args.random or args.input is None:
+        target_images = [get_random_image(dataset_images_dir)]
+        print(f"Selected random image: {target_images[0].name}")
     else:
-        image_path = project_path(args.image)
-        if not image_path.is_file():
-            raise FileNotFoundError(f"Image not found: {image_path}")
+        resolved_path = project_path(args.input)
+        target_images = resolve_image_paths(resolved_path)
+        print(f"Total images to process: {len(target_images)}")
 
     ret_cfg = load_yaml(args.retrieval_config)
     det_cfg = load_yaml(args.detection_config)
@@ -103,29 +121,32 @@ def main() -> None:
         top_k=top_k,
     )
 
-    result = pipeline.predict(image_path, top_k=top_k, detect=not args.no_detect)
-
-    print(f"Processed: {result['image']}")
-    print(f"Found detections: {len(result['detections'])}")
-
-    for i, detection in enumerate(result["detections"], start=1):
-        score_val = detection["score"]
-        score_str = f"{score_val:.3f}" if score_val is not None else "no-detector"
-        print(f"\nDetection #{i} | Conf: {score_str} | Box: {detection['box']}")
-        for match in detection["matches"]:
-            print(
-                f"  Rank {match['rank']}: ID={match['mark_id']} "
-                f"(Score: {match['score']:.4f}) | "
-                f"Book: {match['book']} | Factory: {match['factory']}"
-            )
-
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    preview_path = REPORTS_DIR / f"result_{image_path.stem}.png"
-    render_preview(result, target_size=pipeline.target_size, output_path=preview_path)
-    print(f"\nPreview saved to: {preview_path}")
 
-    if args.show:
-        open_preview(preview_path)
+    for idx, image_path in enumerate(target_images, start=1):
+        print(f"\n[{idx}/{len(target_images)}] Processing: {image_path.name}")
+        result = pipeline.predict(image_path, top_k=top_k, detect=not args.no_detect)
+
+        detections = result.get("detections", [])
+        print(f"Found detections: {len(detections)}")
+
+        for i, detection in enumerate(detections, start=1):
+            score_val = detection["score"]
+            score_str = f"{score_val:.3f}" if score_val is not None else "no-detector"
+            print(f"  Detection #{i} | Conf: {score_str} | Box: {detection['box']}")
+            for match in detection.get("matches", []):
+                print(
+                    f"    Rank {match['rank']}: ID={match['mark_id']} "
+                    f"(Score: {match['score']:.4f}) | "
+                    f"Book: {match['book']} | Factory: {match['factory']}"
+                )
+
+        preview_path = REPORTS_DIR / f"result_{image_path.stem}.png"
+        render_preview(result, target_size=pipeline.target_size, output_path=preview_path)
+        print(f"Preview saved to: {preview_path}")
+
+        if args.show:
+            open_preview(preview_path)
 
 if __name__ == "__main__":
     main()
