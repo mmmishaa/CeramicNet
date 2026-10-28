@@ -33,4 +33,3 @@ boxes, scores = detector.predict(cv2.imread("/path/to/photo.png"))
 
 Для ONNX-инференса нужны NumPy, OpenCV и ONNX Runtime; torch/MMCV/MMDetection
 не требуются. Источники весов и качество: [отчёт RTMDet](../../experiments/detection/RTMDet/README.md).
-
