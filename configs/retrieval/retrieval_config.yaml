@@ -14,3 +14,14 @@ index:
 books:
   dir: "data/books"
   meta_csv: "data/books/meta.csv"
+
+preprocessing:
+  crop:
+    target_size: 224
+    padding_ratio: 0.1
+    pad_value: 255
+  contrast:
+    clip_limit: 2.0
+    tile_grid_size: [8, 8]
+    invert_dark_background: true
+    sharpen: false

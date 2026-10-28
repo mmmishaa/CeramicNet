@@ -3,6 +3,7 @@ import argparse
 import numpy as np
 from tqdm import tqdm
 
+from src.preprocessing.crop import crop_stamp
 from src.preprocessing.image import read_bgr
 from src.retrieval.books import (
     load_book_records,
@@ -79,7 +80,16 @@ def main():
 
     progress = tqdm(records, desc="Эмбеддинги books", unit="mark")
     for record in progress:
-        batch.append(read_bgr(books_dir / record["image_path"]))
+        img = read_bgr(books_dir / record["image_path"])
+        h, w = img.shape[:2]
+        prepared = crop_stamp(
+            image=img,
+            box=(0.0, 0.0, float(w), float(h)),
+            padding_ratio=0.0,
+            target_size=encoder.input_size,
+        )
+        batch.append(prepared)
+
         if len(batch) == args.batch_size:
             vectors.append(encoder.embed_many(batch))
             batch = []
