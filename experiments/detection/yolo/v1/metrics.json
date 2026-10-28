@@ -1,0 +1,43 @@
+{
+  "model": "YOLO26s",
+  "experiment": "v1",
+  "evaluator": "Ultralytics 8.4.183",
+  "split": "validation",
+  "validation": {
+    "images": 61,
+    "positive_images": 51,
+    "negative_images": 10,
+    "instances": 51
+  },
+  "best_checkpoint_validation": {
+    "map_50_95": 0.7051189541816711,
+    "ap50": 0.972862720489502,
+    "precision": 0.9055993556976318,
+    "recall": 0.940517246723175
+  },
+  "evaluations": [
+    {
+      "stage": "best_checkpoint_validation",
+      "source": "ClearML metrics at iteration 50; automatic validation of best.pt",
+      "images": 61,
+      "instances": 51,
+      "map_50_95": 0.7051189541816711,
+      "ap50": 0.972862720489502,
+      "precision": 0.9055993556976318,
+      "recall": 0.940517246723175
+    },
+    {
+      "stage": "explicit_model_val",
+      "source": "Saved notebook stdout; rounded values from the later model.val() call",
+      "images": 61,
+      "instances": 51,
+      "precision": 0.906,
+      "recall": 0.941,
+      "ap50": 0.972,
+      "map_50_95": 0.702
+    }
+  ],
+  "independent_test": false,
+  "comparable_across_reports": false,
+  "comparison_note": "Exact dataset membership and annotation equivalence across runs are not established."
+}
