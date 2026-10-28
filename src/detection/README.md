@@ -11,17 +11,12 @@ BGR 0–255, фиксированный вход 640×640, нормализац�
 и снизу, готовые xyxy и вероятности на выходе. Внешний NMS использует IoU 0.65
 и оставляет максимум 100 рамок. Это другой экспортный контракт, чем у YOLO.
 
-Положить веса в `weights/detection_weights/rtmdet_s_best.onnx` и выбрать конфиг:
-
-```bash
-python main.py --input /path/to/photo.png \
-  --detection-config configs/detection/rtmdet_config.yaml
-```
-
-Конфиг использует выбранный на val confidence **0.84**; для рабочего порога
-**0.5** изменить `conf_threshold`. Параметр `iou_threshold` обработчика относится
-к NMS, а не к сопоставлению рамок с разметкой. У основного приложения также должны
-быть настроены retrieval-веса и индекс; отдельно детектор можно использовать так:
+Для подключения в существующем конфиге приложения указать processor
+`src.detection.rtmdet_processing.RTMDetProcessing`, путь к ONNX, `imgsz: 640`
+и `iou_threshold: 0.65`. Confidence **0.84** выбран на val для precision ≥ 90%;
+другой сохранённый рабочий порог — **0.5**. Параметр `iou_threshold` обработчика
+относится к NMS, а не к сопоставлению рамок с разметкой. Отдельно детектор можно
+использовать так:
 
 ```python
 from pathlib import Path
@@ -39,4 +34,3 @@ boxes, scores = detector.predict(cv2.imread("/path/to/photo.png"))
 Для ONNX-инференса нужны NumPy, OpenCV и ONNX Runtime; torch/MMCV/MMDetection
 не требуются. Источники весов и качество: [отчёт RTMDet](../../experiments/detection/RTMDet/README.md).
 
-Проверки геометрии: `python -m unittest discover -s tests -p 'test_rtmdet_processing.py' -v`.

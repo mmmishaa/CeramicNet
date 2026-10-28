@@ -1,5 +1,0 @@
-weights: "weights/detection_weights/rtmdet_s_best.onnx"
-imgsz: 640
-processor: "src.detection.rtmdet_processing.RTMDetProcessing"
-conf_threshold: 0.84
-iou_threshold: 0.65
