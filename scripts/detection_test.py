@@ -2,6 +2,8 @@ import argparse
 import csv
 from datetime import datetime
 import importlib.util
+import json
+import hashlib
 import os
 from pathlib import Path
 import time
@@ -54,7 +56,8 @@ def compute_ap_101_point(recall: np.ndarray, precision: np.ndarray) -> float:
     x = np.linspace(0, 1, 101)
     y = np.interp(x, mrec, mpre)
 
-    return float(np.trapezoid(y, x))
+    integrate = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
+    return float(integrate(y, x))
 
 
 def evaluate_detections(records: list[dict], iou_thresh: float = 0.5) -> dict:
@@ -256,10 +259,17 @@ def parse_args():
         default=str(default_csv),
         help="Путь к файлу сохранения результатов",
     )
+    parser.add_argument(
+        "--output_json", type=str, default=None,
+        help="Новый JSON с метриками, параметрами и предсказаниями; существующий файл не заменяется",
+    )
     return parser.parse_args()
 
 def main():
     args = parse_args()
+    json_path = ROOT_DIR / args.output_json if args.output_json else None
+    if json_path is not None and json_path.exists():
+        raise FileExistsError(f"Отчёт уже существует: {json_path}")
     config_path = ROOT_DIR / args.config
 
     if not config_path.is_file():
@@ -323,6 +333,7 @@ def main():
     print(f"Пороги: conf={conf_threshold}, iou={iou_threshold}")
 
     new_results = []
+    json_results = []
 
     for name, model_cfg in models_to_test:
         raw_weights = model_cfg.get("weights")
@@ -332,6 +343,8 @@ def main():
         imgsz = int(model_cfg.get("imgsz", 640))
 
         if not weights_path or not weights_path.is_file():
+            if target_model_name:
+                raise FileNotFoundError(f"Файл весов для {name} не найден: {weights_path}")
             print(f"\n[ОШИБКА] Файл весов для {name} не найден: {weights_path}")
             continue
 
@@ -354,7 +367,6 @@ def main():
         session = ort.InferenceSession(str(weights_path), providers=providers)
         
         input_name = session.get_inputs()[0].name
-        output_name = session.get_outputs()[0].name
 
         latencies = []
         records = []
@@ -369,7 +381,7 @@ def main():
             t0 = time.perf_counter()
             blob, metadata = processor.preprocess(image_np)
 
-            raw_outputs = session.run([output_name], {input_name: blob})
+            raw_outputs = session.run(None, {input_name: blob})
 
             pred_boxes, pred_scores = processor.postprocess(
                 output=raw_outputs,
@@ -415,10 +427,43 @@ def main():
                 "Total_GT": str(metrics["total_gt"]),
             }
         )
+        if json_path is not None:
+            json_results.append({
+                "model": name,
+                "timestamp": current_time,
+                "weights_sha256": hashlib.sha256(weights_path.read_bytes()).hexdigest(),
+                "processor": processor_path,
+                "imgsz": imgsz,
+                "conf_threshold": processor.conf_threshold,
+                "nms_iou_threshold": processor.iou_threshold,
+                "matching_iou_threshold": iou_threshold,
+                "providers": session.get_providers(),
+                "metrics": metrics,
+                "latency_ms": float(mean_ms),
+                "fps": float(fps),
+                "images": [
+                    {"file_name": item["file_name"],
+                     "pred_boxes": record["pred_boxes"].tolist(),
+                     "pred_scores": record["pred_scores"].tolist(),
+                     "gt_boxes": record["gt_boxes"].tolist()}
+                    for item, record in zip(dataset.items, records)
+                ],
+            })
 
     if new_results:
         out_csv = ROOT_DIR / args.output_csv
         update_results_csv(out_csv, new_results)
+        if json_path is not None:
+            json_path.parent.mkdir(parents=True, exist_ok=True)
+            with json_path.open("x", encoding="utf-8") as stream:
+                json.dump({
+                    "annotations_sha256": hashlib.sha256(coco_json.read_bytes()).hexdigest(),
+                    "dataset_config": dataset_cfg,
+                    "positive_images": num_positive,
+                    "negative_images": num_negative,
+                    "evaluation_note": "AP is computed after the configured confidence cutoff, using the repository evaluator.",
+                    "results": json_results,
+                }, stream, ensure_ascii=False, indent=2)
 
 if __name__ == "__main__":
     main()

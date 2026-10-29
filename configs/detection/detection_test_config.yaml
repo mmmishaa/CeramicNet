@@ -25,3 +25,8 @@ detectors:
     weights: "weights/detection_weights/rtmdet.onnx"
     imgsz: 640
     processor: "src.detection.rtmdet_processing.RTMDetProcessing"
+
+  rtdetr_v2_s:
+    weights: "weights/detection_weights/rtdetr_v2_s.onnx"
+    imgsz: 640
+    processor: "src.detection.rtdetr_processing.RTDetrProcessing"

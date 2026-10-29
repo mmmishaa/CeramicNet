@@ -1,4 +1,5 @@
 import importlib
+import inspect
 from pathlib import Path
 import numpy as np
 import onnxruntime as ort
@@ -74,7 +75,7 @@ def build_detector(config: dict, conf_threshold: float | None = None) -> StampDe
 
     module_path, class_name = detector_cfg["processor"].rsplit(".", 1)
     module = importlib.import_module(module_path)
-    processor = getattr(module, class_name)()
+    processor_cls = getattr(module, class_name)
 
     image_size = int(detector_cfg.get("imgsz", 640))
     conf = (
@@ -84,5 +85,9 @@ def build_detector(config: dict, conf_threshold: float | None = None) -> StampDe
     )
     iou = float(config.get("confidence_config", {}).get("iou_threshold", 0.5))
 
-    sized = _SizedProcessor(processor, image_size, conf, iou)
-    return StampDetector(weights, sized)
+    params = inspect.signature(processor_cls).parameters
+    if all(key in params for key in ("imgsz", "conf_threshold", "iou_threshold")):
+        processor = processor_cls(imgsz=image_size, conf_threshold=conf, iou_threshold=iou)
+    else:
+        processor = _SizedProcessor(processor_cls(), image_size, conf, iou)
+    return StampDetector(weights, processor)

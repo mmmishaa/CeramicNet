@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-29",
+  "status": "processor_verified_model_evaluation_blocked_missing_weights",
+  "unit_tests_passed": 7,
+  "onnx_contract_integration": "passed_synthetic_two_output_graph_not_trained_model",
+  "preprocessing_reference": {
+    "repository": "mmmishaa/CeramicNet",
+    "commit": "d6c611fa1c0999180c141dd255f1f341b9b5961e",
+    "path": "dataset/datasets.py",
+    "function": "_letterbox",
+    "images_checked": 77,
+    "positive_images": 51,
+    "negative_images": 26,
+    "ground_truth_boxes": 51,
+    "maximum_absolute_float32_error": 0.0,
+    "annotations_sha256": "cdd3005bbc5045accc4a965c4e244c74fd0b25a403535047c043e6df080a225c",
+    "split": {
+      "class": "TestDetectionDataset",
+      "val_ratio": 0.2,
+      "random_state": 42
+    }
+  },
+  "numpy_version": "1.26.4",
+  "onnxruntime_version": "1.20.1",
+  "model_quality_metrics": null
+}
