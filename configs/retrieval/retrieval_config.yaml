@@ -36,6 +36,17 @@ models:
     index:
       path: "data/books_index/books_index.npz"
 
+  student_encoder_katya:
+    encoder:
+      weights: "weights/retrieval_weights/student_encoder_katya.onnx"
+      input_size: 224
+      mean: [0.0, 0.0, 0.0]
+      std: [1.0, 1.0, 1.0]
+      num_threads: 4
+      enhance_contrast: true
+    index:
+      path: "data/books_index/student_encoder_katya.npz"
+
 books:
   dir: "data/books"
   meta_csv: "data/books/meta.csv"
