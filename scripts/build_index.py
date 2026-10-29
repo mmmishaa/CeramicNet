@@ -3,6 +3,7 @@ import argparse
 import numpy as np
 from tqdm import tqdm
 
+from src.preprocessing.crop import crop_stamp
 from src.preprocessing.image import read_bgr
 from src.retrieval.books import (
     load_book_records,
@@ -79,7 +80,10 @@ def main():
 
     progress = tqdm(records, desc="Эмбеддинги books", unit="mark")
     for record in progress:
-        batch.append(read_bgr(books_dir / record["image_path"]))
+        image = read_bgr(books_dir / record["image_path"])
+        height, width = image.shape[:2]
+        # Энкодер принимает только квадрат input_size: эталон режем так же, как кроп запроса.
+        batch.append(crop_stamp(image, (0, 0, width, height), target_size=encoder.input_size))
         if len(batch) == args.batch_size:
             vectors.append(encoder.embed_many(batch))
             batch = []
