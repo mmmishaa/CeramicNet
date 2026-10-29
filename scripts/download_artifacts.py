@@ -6,25 +6,48 @@ from pathlib import Path
 
 import gdown
 
-from src.paths import ROOT_DIR, DATA_DIR, WEIGHTS_DIR
+from src.paths import ROOT_DIR, DATA_DIR, WEIGHTS_DIR, CONFIGS_DIR
+from src.utils import load_yaml
 
 CATEGORIES = ("detection", "retrieval", "books", "dataset")
 DEFAULT_CATEGORIES = ("detection", "retrieval", "books")
 
-# Preferred model filename priority (prefer best models if present on Drive)
-PRIORITY_MODELS = {
-    "detection": ["yolo26s_v1.onnx", "yolo26s.onnx"],
-    "retrieval": ["stamp_encoder_v2.onnx", "stamp_encoder.onnx"],
-}
+def get_active_priority() -> dict:
+    priority = {
+        "detection": ["rtdetr_v2_s.onnx", "yolo26s_v1.onnx", "yolo26s.onnx", "rtmdet.onnx"],
+        "retrieval": ["student_encoder_katya.onnx", "stamp_encoder_v2.onnx", "stamp_encoder.onnx"],
+    }
+    try:
+        det_cfg = load_yaml(CONFIGS_DIR / "detection" / "detection_config.yaml")
+        if "weights" in det_cfg:
+            w_name = Path(det_cfg["weights"]).name
+            if w_name in priority["detection"]:
+                priority["detection"].remove(w_name)
+            priority["detection"].insert(0, w_name)
+    except Exception:
+        pass
+    try:
+        ret_cfg = load_yaml(CONFIGS_DIR / "retrieval" / "retrieval_config.yaml")
+        act = ret_cfg.get("active_model", "student_encoder_katya")
+        if "models" in ret_cfg and act in ret_cfg["models"]:
+            w_name = Path(ret_cfg["models"][act]["encoder"]["weights"]).name
+            if w_name in priority["retrieval"]:
+                priority["retrieval"].remove(w_name)
+            priority["retrieval"].insert(0, w_name)
+    except Exception:
+        pass
+    return priority
+
+PRIORITY_MODELS = get_active_priority()
 
 CANONICAL_SOURCES = {
-    "detection": "yolo26s_v1.onnx",
-    "retrieval": "stamp_encoder_v2.onnx",
+    "detection": "rtdetr_v2_s.onnx",
+    "retrieval": "student_encoder_katya.onnx",
 }
 
 CANONICAL_TARGETS = {
-    "detection": "yolo26s.onnx",
-    "retrieval": "stamp_encoder.onnx",
+    "detection": "rtdetr_v2_s.onnx",
+    "retrieval": "student_encoder_katya.onnx",
 }
 
 

@@ -76,6 +76,11 @@ def parse_args():
     parser.add_argument("--top-k", type=int, default=10, help="Top-K cutoff (default: 10)")
     parser.add_argument("--no-detect", action="store_true", help="Disable stamp detector (pure crop retrieval)")
     parser.add_argument(
+        "--rebuild-index",
+        action="store_true",
+        help="Force rebuild index even if .npz file already exists on disk",
+    )
+    parser.add_argument(
         "--output-csv",
         type=Path,
         default=REPORTS_DIR / "retrieval_test_results.csv",
@@ -252,8 +257,11 @@ def main():
         print(f"  Weights: {weights_file}")
         encoder = StampEncoder.from_mapping(encoder_dict, weights=weights_file)
 
-        if not index_file.is_file():
-            print(f"  [Index missing] Index not found at: {index_file}")
+        if args.rebuild_index or not index_file.is_file():
+            if args.rebuild_index and index_file.is_file():
+                print(f"  [Rebuild] Rebuilding index (--rebuild-index passed): {index_file}")
+            else:
+                print(f"  [Index missing] Index not found at: {index_file}")
             print(f"  --> Automatically building index for '{name}'...")
             index = build_index_for_model(encoder, books_path, books_meta_csv, index_file)
         else:

@@ -1,8 +1,19 @@
 top_k: 10
 
-active_model: "stamp_encoder"
+active_model: "student_encoder_katya"
 
 models:
+  stamp_encoder_v2:
+    encoder:
+      weights: "weights/retrieval_weights/stamp_encoder_v2.onnx"
+      input_size: 224
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
+      num_threads: 4
+      enhance_contrast: true
+    index:
+      path: "data/books_index/books_index_stamp_encoder_v2.npz"
+
   stamp_encoder:
     encoder:
       weights: "weights/retrieval_weights/stamp_encoder.onnx"
@@ -57,6 +68,17 @@ models:
       enhance_contrast: true
     index:
       path: "data/books_index/books_index_encoder_sasha.npz"
+
+  dino_clean:
+    encoder:
+      weights: "weights/retrieval_weights/dino_clean.onnx"
+      input_size: 224
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
+      num_threads: 4
+      enhance_contrast: false
+    index:
+      path: "data/books_index/books_index_dino_clean.npz"
 
 books:
   dir: "data/books"
