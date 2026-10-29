@@ -1,0 +1,2 @@
+Model,Timestamp,mAP50,mAP50-95,Precision,Recall,F1,Latency_ms,FPS,TP,Total_Pred,Total_GT
+rtdetr_v2_s,2026-10-29 15:34:21,0.9361,0.7677,1.0000,0.8723,0.9318,215.43,4.6,41,41,47

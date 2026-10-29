@@ -4,6 +4,7 @@ import argparse
 import contextlib
 import io
 import json
+import hashlib
 from pathlib import Path
 from unittest.mock import patch
 
@@ -129,7 +130,7 @@ class RTDetrProcessingTests(unittest.TestCase):
             report = Path(folder) / "results.json"
             args = argparse.Namespace(config=str(benchmark_config), model="rtdetr_contract_test",
                                       conf=None, iou=None, output_csv=str(Path(folder) / "results.csv"),
-                                      output_json=str(report))
+                                      output_json=str(report), split_manifest=None)
             with patch("scripts.detection_test.parse_args", return_value=args), contextlib.redirect_stdout(io.StringIO()):
                 benchmark_main()
                 result = json.loads(report.read_text())["results"][0]
@@ -140,6 +141,24 @@ class RTDetrProcessingTests(unittest.TestCase):
                 with self.assertRaises(FileExistsError):
                     benchmark_main()
                 self.assertEqual(report.read_bytes(), saved)
+                manifest = Path(folder) / "split.json"
+                manifest.write_text(json.dumps({
+                    "annotations_sha256": hashlib.sha256(annotations.read_bytes()).hexdigest(),
+                    "files": ["sample_1.png"],
+                    "image_sha256": {"sample_1.png": hashlib.sha256((Path(folder) / "sample_1.png").read_bytes()).hexdigest()},
+                }))
+                args.split_manifest = str(manifest)
+                args.output_json = str(Path(folder) / "manifest_results.json")
+                args.output_csv = str(Path(folder) / "manifest_results.csv")
+                benchmark_main()
+                verified = json.loads(Path(args.output_json).read_text())
+                self.assertEqual(verified["results"][0]["metrics"]["true_positives"], 1)
+                args.output_json = str(Path(folder) / "invalid_results.json")
+                invalid = json.loads(manifest.read_text())
+                invalid["image_sha256"]["sample_1.png"] = "wrong"
+                manifest.write_text(json.dumps(invalid))
+                with self.assertRaisesRegex(ValueError, "SHA256 изображения"):
+                    benchmark_main()
 
 
 if __name__ == "__main__":

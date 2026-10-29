@@ -1,0 +1,116 @@
+{
+  "model": "RT-DETRv2-S",
+  "date": "2026-10-29",
+  "timezone": "Europe/Moscow",
+  "weights": {
+    "filename": "rtdetr_v2_s.onnx",
+    "size_bytes": 80703254,
+    "sha256": "e4a16ac419f39f278ef5561a74dbc46550092abdc51c28aa4bced4c8f7746cae",
+    "source": "User-provided Downloads/rtdetr_v2_s.onnx",
+    "inputs": {
+      "pixel_values": [
+        1,
+        3,
+        640,
+        640
+      ]
+    },
+    "outputs": {
+      "logits": [
+        1,
+        300,
+        1
+      ],
+      "pred_boxes": [
+        1,
+        300,
+        4
+      ]
+    }
+  },
+  "processor": "src.detection.rtdetr_processing.RTDetrProcessing",
+  "coco": {
+    "evaluator": "pycocotools COCOeval bbox",
+    "max_detections": [
+      1,
+      10,
+      100
+    ],
+    "confidence_cutoff": 0.001,
+    "metrics": {
+      "map50_95": 0.7357701975204904,
+      "map50": 0.9609812973089222,
+      "ap75": 0.8496350349268247,
+      "ap_small": 0.5999999999999999,
+      "ap_medium": 0.7018738358798285,
+      "ap_large": 0.7746691298585769,
+      "ar1": 0.7617021276595746,
+      "ar10": 0.7893617021276597,
+      "ar100": 0.8042553191489361,
+      "ar_small": 0.6,
+      "ar_medium": 0.7842105263157895,
+      "ar_large": 0.8259259259259257
+    }
+  },
+  "operating_point": {
+    "confidence": 0.75,
+    "matching_iou": 0.5,
+    "nms_iou": 0.5,
+    "precision": 1.0,
+    "recall": 0.8723404255319149,
+    "f1": 0.9318181818181819,
+    "tp": 41,
+    "fp": 0,
+    "fn": 6,
+    "negative_images": 14,
+    "negative_images_with_predictions": 0
+  },
+  "dataset": {
+    "images": 61,
+    "positive_images": 47,
+    "negative_images": 14,
+    "ground_truth_boxes": 47,
+    "manifest": "notebook_holdout_manifest.json",
+    "annotations_sha256": "cdd3005bbc5045accc4a965c4e244c74fd0b25a403535047c043e6df080a225c",
+    "membership": "Reconstructed notebook validation split; all 47 positive file names and the first negative match saved notebook outputs. Other negatives reconstructed from the original local pool. Used for checkpoint selection, not an independent test."
+  },
+  "performance": {
+    "platform": "macOS-26.5.1-arm64-arm-64bit",
+    "cpu": "Apple M5",
+    "provider": "CPUExecutionProvider",
+    "threads": "ONNX Runtime default",
+    "latency_ms": 215.42932240952751,
+    "fps": 4.641893632747991,
+    "scope": "preprocess + ONNX inference + postprocess; image reading excluded; no separate warmup; confidence 0.75"
+  },
+  "repository_evaluator": {
+    "precision": 1.0,
+    "recall": 0.8723404255319149,
+    "f1": 0.9318181818181819,
+    "map50": 0.9360999999999999,
+    "map50_95": 0.767738647530618,
+    "true_positives": 41,
+    "total_pred": 41,
+    "total_gt": 47
+  },
+  "current_77_image_screening": {
+    "metrics": {
+      "precision": 0.9423076923076923,
+      "recall": 0.9607843137254902,
+      "f1": 0.9514563106796117,
+      "map50": 0.9594455400981996,
+      "map50_95": 0.8604756820470654,
+      "true_positives": 49,
+      "total_pred": 52,
+      "total_gt": 51
+    },
+    "positive_images": 51,
+    "negative_images": 26,
+    "positive_images_in_notebook_validation": 8,
+    "positive_images_in_notebook_training": 43,
+    "note": "Contains training images; not an estimate of held-out quality."
+  },
+  "consistency_check": "Filtering the low-confidence predictions at score > 0.75 reproduces the separate high-confidence run (all 61 images, box tolerance 1e-5, score tolerance 1e-7).",
+  "evaluation_base_commit": "e0499287b89c62165977de728a5123acca50f8ec",
+  "evaluation_code": "scripts/detection_test.py and experiments/detection/rtdetr/coco_metrics.py as saved with this report"
+}

@@ -7,6 +7,7 @@ import hashlib
 import os
 from pathlib import Path
 import time
+import unicodedata
 import cv2
 import numpy as np
 import onnxruntime as ort
@@ -263,6 +264,10 @@ def parse_args():
         "--output_json", type=str, default=None,
         help="Новый JSON с метриками, параметрами и предсказаниями; существующий файл не заменяется",
     )
+    parser.add_argument(
+        "--split_manifest", type=str, default=None,
+        help="JSON со списком files и SHA256 изображений для сохранённого тестового набора",
+    )
     return parser.parse_args()
 
 def main():
@@ -310,10 +315,29 @@ def main():
         negative_dirs=negative_dirs,
         negative_ratio=0.2,
         as_bgr=True,
-        split="val",
+        split=None if args.split_manifest else "val",
         val_ratio=val_ratio,
         random_state=random_state,
     )
+    manifest = None
+    if args.split_manifest:
+        manifest_path = ROOT_DIR / args.split_manifest
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if hashlib.sha256(coco_json.read_bytes()).hexdigest() != manifest["annotations_sha256"]:
+            raise ValueError("SHA256 аннотаций не совпадает с тестовым манифестом")
+        by_name = {unicodedata.normalize("NFC", item["file_name"]): item for item in dataset.items}
+        names = [unicodedata.normalize("NFC", name) for name in manifest["files"]]
+        if not names or len(set(names)) != len(names):
+            raise ValueError("Манифест должен содержать непустой список уникальных файлов")
+        selected = []
+        for name in names:
+            if name not in by_name:
+                raise FileNotFoundError(f"Файл из манифеста не найден в датасете: {name}")
+            item = by_name[name]
+            if hashlib.sha256(item["path"].read_bytes()).hexdigest() != manifest["image_sha256"][name]:
+                raise ValueError(f"SHA256 изображения не совпадает: {name}")
+            selected.append(item)
+        dataset.items = selected
 
     all_detectors = config.get("detectors", {})
     target_model_name = args.model or config.get("run_only")
@@ -459,6 +483,7 @@ def main():
                 json.dump({
                     "annotations_sha256": hashlib.sha256(coco_json.read_bytes()).hexdigest(),
                     "dataset_config": dataset_cfg,
+                    "split_manifest": manifest,
                     "positive_images": num_positive,
                     "negative_images": num_negative,
                     "evaluation_note": "AP is computed after the configured confidence cutoff, using the repository evaluator.",
