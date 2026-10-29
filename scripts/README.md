@@ -28,7 +28,6 @@ python -m scripts.download_artifacts --folder_id <ID папки на гугл д
 | `--list` | флаг | Нет | Только показать файлы в папке и их категории, затем выйти. Ничего не скачивается. |
 | `--detection` | флаг | Нет | Скачать веса детекции (`*.onnx`) в `weights/detection_weights`. |
 | `--retrieval` | флаг | Нет | Скачать веса retrieval (`*.onnx`) в `weights/retrieval_weights`. |
-| `--index` | флаг | Нет | Скачать индекс книг (`*.npz`) в `data/books_index`. |
 | `--books` | флаг | Нет | Скачать и распаковать `books.zip` в `data/books`. |
 | `--dataset` | флаг | Нет | Скачать и распаковать `ceramic_dataset.zip` в `data/ceramic_dataset`. |
 

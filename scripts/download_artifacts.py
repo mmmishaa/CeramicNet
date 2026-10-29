@@ -8,19 +8,18 @@ import gdown
 
 from src.paths import ROOT_DIR, DATA_DIR, WEIGHTS_DIR
 
-CATEGORIES = ("detection", "retrieval", "index", "books", "dataset")
-DEFAULT_CATEGORIES = ("detection", "retrieval", "index", "books")
+CATEGORIES = ("detection", "retrieval", "books", "dataset")
+DEFAULT_CATEGORIES = ("detection", "retrieval", "books")
 
-PRIMARY_MODELS = {
-    "detection": ("yolo26s.onnx", "yolo26s_v2.onnx"),
-    "retrieval": ("stamp_encoder.onnx", "stamp_encoder_v2.onnx"),
-    "index": ("stamp_books_index.npz", "stamp_books_index_v2.npz"),
+# Preferred model filename priority (prefer latest fine-tuned version if present on Drive)
+PRIORITY_MODELS = {
+    "detection": ["yolo26s_v2.onnx", "yolo26s.onnx"],
+    "retrieval": ["stamp_encoder_v2.onnx", "stamp_encoder.onnx"],
 }
 
-CANONICAL_ALIASES = {
-    "detection": {"yolo26s_v2.onnx": "yolo26s.onnx", "yolo26s.onnx": "yolo26s_v2.onnx"},
-    "retrieval": {"stamp_encoder_v2.onnx": "stamp_encoder.onnx", "stamp_encoder.onnx": "stamp_encoder_v2.onnx"},
-    "index": {"stamp_books_index_v2.npz": "stamp_books_index.npz", "stamp_books_index.npz": "stamp_books_index_v2.npz"},
+CANONICAL_NAMES = {
+    "detection": "yolo26s.onnx",
+    "retrieval": "stamp_encoder.onnx",
 }
 
 
@@ -32,19 +31,20 @@ def call_supported(func, **kwargs):
 
 def copy_weight(src: Path, target_dir: Path, category: str = None) -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
-    dst = target_dir / src.name
-    if not dst.exists():
-        shutil.copy2(src, dst)
-        print(f"Added: {src.name} -> {target_dir.name}")
-
-    # Ensure canonical / legacy alias exists
-    if category and category in CANONICAL_ALIASES:
-        alias_name = CANONICAL_ALIASES[category].get(src.name)
-        if alias_name:
-            alias_path = target_dir / alias_name
-            if not alias_path.exists():
-                shutil.copy2(src, alias_path)
-                print(f"Created alias: {alias_name} -> {target_dir.name}")
+    canonical = CANONICAL_NAMES.get(category)
+    
+    # Copy as canonical name
+    if canonical:
+        dst_canonical = target_dir / canonical
+        shutil.copy2(src, dst_canonical)
+        print(f"Added: {src.name} -> {target_dir.name}/{canonical}")
+    
+    # Also keep original filename if different for backwards-compatibility
+    if src.name != canonical:
+        dst_orig = target_dir / src.name
+        if not dst_orig.exists():
+            shutil.copy2(src, dst_orig)
+            print(f"Created alias: {src.name} -> {target_dir.name}")
 
 
 def extract_archive(zip_file: Path, extract_to: Path) -> None:
@@ -81,8 +81,6 @@ def categorize(rel_path: str, has_detection_dir: bool) -> set:
             cats.add("detection")
         if in_ret:
             cats.add("retrieval")
-    if name.endswith(".npz"):
-        cats.add("index")
     if name == "books.zip":
         cats.add("books")
     if name == "ceramic_dataset.zip":
@@ -117,9 +115,8 @@ def main() -> None:
     parser.add_argument("--list", action="store_true", help="Only show files in the folder and exit")
 
     group = parser.add_argument_group("Selective download (combine freely)")
-    group.add_argument("--detection", action="store_true", help="Detection weights (*.onnx)")
-    group.add_argument("--retrieval", action="store_true", help="Retrieval weights (*.onnx)")
-    group.add_argument("--index", action="store_true", help="Books index (*.npz)")
+    group.add_argument("--detection", action="store_true", help="Detection model weights (*.onnx)")
+    group.add_argument("--retrieval", action="store_true", help="Retrieval model weights (*.onnx)")
     group.add_argument("--books", action="store_true", help="Books catalog archive (books.zip)")
     group.add_argument("--dataset", action="store_true", help="Training dataset (ceramic_dataset.zip)")
     args = parser.parse_args()
@@ -130,7 +127,7 @@ def main() -> None:
     elif args.dev:
         selected = list(CATEGORIES)
     else:
-        # Default mode: runtime essentials only (no heavy dataset, only active models)
+        # Default mode: runtime essentials only (single active models, no heavy dataset)
         selected = list(DEFAULT_CATEGORIES)
 
     url = f"https://drive.google.com/drive/folders/{args.folder_id}"
@@ -147,14 +144,22 @@ def main() -> None:
     for c in ("books", "dataset"):
         plan[c] = plan[c][:1]
 
-    # In default mode (non-dev, non-selective), filter weights to active/primary models only
+    # In default mode (non-dev, non-selective): download ONLY the single active model for each category
     if not args.dev and not user_selected:
-        for cat, preferred_names in PRIMARY_MODELS.items():
-            preferred_files = [
-                f for f in plan[cat] if Path(f.path).name.lower() in [n.lower() for n in preferred_names]
-            ]
-            if preferred_files:
-                plan[cat] = preferred_files
+        for cat in ("detection", "retrieval"):
+            candidates = plan[cat]
+            chosen = None
+            for preferred in PRIORITY_MODELS[cat]:
+                for f in candidates:
+                    if Path(f.path).name.lower() == preferred.lower():
+                        chosen = f
+                        break
+                if chosen:
+                    break
+            if chosen:
+                plan[cat] = [chosen]
+            elif candidates:
+                plan[cat] = [candidates[0]]
 
     if args.list:
         print(f"\nFiles in folder: {len(files)}")
@@ -171,8 +176,6 @@ def main() -> None:
     retrieval_target = WEIGHTS_DIR / "retrieval_weights"
     dataset_target = DATA_DIR / "ceramic_dataset"
     books_target = DATA_DIR / "books"
-    index_target = DATA_DIR / "books_index"
-    index_target.mkdir(parents=True, exist_ok=True)
 
     books_exists = books_target.exists() and any(books_target.iterdir())
     dataset_exists = dataset_target.exists() and any(dataset_target.iterdir())
@@ -220,11 +223,6 @@ def main() -> None:
         for f in plan["retrieval"]:
             if (p := local(f)):
                 copy_weight(p, retrieval_target, category="retrieval")
-
-    if "index" in selected:
-        for f in plan["index"]:
-            if (p := local(f)):
-                copy_weight(p, index_target, category="index")
 
     if "books" in selected and not books_exists:
         for f in plan["books"]:
