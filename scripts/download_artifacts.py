@@ -11,13 +11,18 @@ from src.paths import ROOT_DIR, DATA_DIR, WEIGHTS_DIR
 CATEGORIES = ("detection", "retrieval", "books", "dataset")
 DEFAULT_CATEGORIES = ("detection", "retrieval", "books")
 
-# Preferred model filename priority (prefer latest fine-tuned version if present on Drive)
+# Preferred model filename priority (prefer best models if present on Drive)
 PRIORITY_MODELS = {
-    "detection": ["yolo26s_v2.onnx", "yolo26s.onnx"],
+    "detection": ["yolo26s_v1.onnx", "yolo26s.onnx"],
     "retrieval": ["stamp_encoder_v2.onnx", "stamp_encoder.onnx"],
 }
 
-CANONICAL_NAMES = {
+CANONICAL_SOURCES = {
+    "detection": "yolo26s_v1.onnx",
+    "retrieval": "stamp_encoder_v2.onnx",
+}
+
+CANONICAL_TARGETS = {
     "detection": "yolo26s.onnx",
     "retrieval": "stamp_encoder.onnx",
 }
@@ -31,20 +36,21 @@ def call_supported(func, **kwargs):
 
 def copy_weight(src: Path, target_dir: Path, category: str = None) -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
-    canonical = CANONICAL_NAMES.get(category)
     
-    # Copy as canonical name
-    if canonical:
-        dst_canonical = target_dir / canonical
-        shutil.copy2(src, dst_canonical)
-        print(f"Added: {src.name} -> {target_dir.name}/{canonical}")
-    
-    # Also keep original filename if different for backwards-compatibility
-    if src.name != canonical:
-        dst_orig = target_dir / src.name
-        if not dst_orig.exists():
-            shutil.copy2(src, dst_orig)
-            print(f"Created alias: {src.name} -> {target_dir.name}")
+    # 1. Always copy file under its downloaded filename
+    dst = target_dir / src.name
+    shutil.copy2(src, dst)
+    print(f"Added: {src.name} -> {target_dir.name}")
+
+    # 2. If this is the chosen best model, also save/alias as canonical name
+    if category:
+        source_name = CANONICAL_SOURCES.get(category)
+        canonical_name = CANONICAL_TARGETS.get(category)
+        if canonical_name and (src.name == source_name or src.name == canonical_name):
+            dst_canonical = target_dir / canonical_name
+            shutil.copy2(src, dst_canonical)
+            if src.name != canonical_name:
+                print(f"Created canonical alias: {canonical_name} (from {src.name}) -> {target_dir.name}")
 
 
 def extract_archive(zip_file: Path, extract_to: Path) -> None:
