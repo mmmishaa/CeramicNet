@@ -1,5 +1,5 @@
-weights: "weights/detection_weights/yolo26s.onnx"
+weights: "weights/detection_weights/rtdetr_v2_s.onnx"
 imgsz: 640
-processor: "src.detection.yolo_processing.YOLOProcessing"
+processor: "src.detection.rtdetr_processing.RTDetrProcessing"
 conf_threshold: 0.75
 iou_threshold: 0.5
