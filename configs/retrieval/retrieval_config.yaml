@@ -1,14 +1,14 @@
 top_k: 10
 
-active_model: "stamp_encoder_v2"
+active_model: "stamp_encoder"
 
 models:
   stamp_encoder:
     encoder:
       weights: "weights/retrieval_weights/stamp_encoder.onnx"
       input_size: 224
-      mean: [0.0, 0.0, 0.0]
-      std: [1.0, 1.0, 1.0]
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
       num_threads: 4
       enhance_contrast: true
     index:
@@ -16,14 +16,14 @@ models:
   
   stamp_encoder_v2:
     encoder:
-      weights: "weights/retrieval_weights/stamp_encoder_v2.onnx"
+      weights: "weights/retrieval_weights/stamp_encoder.onnx"
       input_size: 224
       mean: [0.485, 0.456, 0.406]
       std: [0.229, 0.224, 0.225]
       num_threads: 4
       enhance_contrast: true
     index:
-      path: "data/books_index/stamp_books_index_v2.npz"
+      path: "data/books_index/stamp_books_index.npz"
 
   student_encoder:
     encoder:

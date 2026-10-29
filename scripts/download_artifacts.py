@@ -9,6 +9,20 @@ import gdown
 from src.paths import ROOT_DIR, DATA_DIR, WEIGHTS_DIR
 
 CATEGORIES = ("detection", "retrieval", "index", "books", "dataset")
+DEFAULT_CATEGORIES = ("detection", "retrieval", "index", "books")
+
+PRIMARY_MODELS = {
+    "detection": ("yolo26s.onnx", "yolo26s_v2.onnx"),
+    "retrieval": ("stamp_encoder.onnx", "stamp_encoder_v2.onnx"),
+    "index": ("stamp_books_index.npz", "stamp_books_index_v2.npz"),
+}
+
+CANONICAL_ALIASES = {
+    "detection": {"yolo26s_v2.onnx": "yolo26s.onnx", "yolo26s.onnx": "yolo26s_v2.onnx"},
+    "retrieval": {"stamp_encoder_v2.onnx": "stamp_encoder.onnx", "stamp_encoder.onnx": "stamp_encoder_v2.onnx"},
+    "index": {"stamp_books_index_v2.npz": "stamp_books_index.npz", "stamp_books_index.npz": "stamp_books_index_v2.npz"},
+}
+
 
 def call_supported(func, **kwargs):
     """Call func, passing only the kwargs supported by the installed gdown version."""
@@ -16,12 +30,21 @@ def call_supported(func, **kwargs):
     return func(**{k: v for k, v in kwargs.items() if k in params})
 
 
-def copy_weight(src: Path, target_dir: Path) -> None:
+def copy_weight(src: Path, target_dir: Path, category: str = None) -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
     dst = target_dir / src.name
     if not dst.exists():
         shutil.copy2(src, dst)
-        print(f"Added weight: {src.name} -> {target_dir.name}")
+        print(f"Added: {src.name} -> {target_dir.name}")
+
+    # Ensure canonical / legacy alias exists
+    if category and category in CANONICAL_ALIASES:
+        alias_name = CANONICAL_ALIASES[category].get(src.name)
+        if alias_name:
+            alias_path = target_dir / alias_name
+            if not alias_path.exists():
+                shutil.copy2(src, alias_path)
+                print(f"Created alias: {alias_name} -> {target_dir.name}")
 
 
 def extract_archive(zip_file: Path, extract_to: Path) -> None:
@@ -83,20 +106,32 @@ def list_folder(url: str):
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="artifact synchronization (no category flags = download everything)"
+        description="CeramicNet artifact synchronization. By default downloads only runtime essentials."
     )
-    parser.add_argument("--folder_id", type=str, required=True)
-    parser.add_argument("--list", action="store_true", help="only show files in the folder and exit")
+    parser.add_argument("--folder_id", type=str, required=True, help="Google Drive shared folder ID")
+    parser.add_argument(
+        "--dev",
+        action="store_true",
+        help="Download all artifacts: full training dataset (ceramic_dataset.zip) and all experimental weights",
+    )
+    parser.add_argument("--list", action="store_true", help="Only show files in the folder and exit")
 
-    group = parser.add_argument_group("what to download (combine freely)")
-    group.add_argument("--detection", action="store_true", help="detection weights (*.onnx)")
-    group.add_argument("--retrieval", action="store_true", help="retrieval weights (*.onnx)")
-    group.add_argument("--index", action="store_true", help="books index (*.npz)")
-    group.add_argument("--books", action="store_true", help="books.zip")
-    group.add_argument("--dataset", action="store_true", help="ceramic_dataset.zip")
+    group = parser.add_argument_group("Selective download (combine freely)")
+    group.add_argument("--detection", action="store_true", help="Detection weights (*.onnx)")
+    group.add_argument("--retrieval", action="store_true", help="Retrieval weights (*.onnx)")
+    group.add_argument("--index", action="store_true", help="Books index (*.npz)")
+    group.add_argument("--books", action="store_true", help="Books catalog archive (books.zip)")
+    group.add_argument("--dataset", action="store_true", help="Training dataset (ceramic_dataset.zip)")
     args = parser.parse_args()
 
-    selected = [c for c in CATEGORIES if getattr(args, c)] or list(CATEGORIES)
+    user_selected = [c for c in CATEGORIES if getattr(args, c)]
+    if user_selected:
+        selected = user_selected
+    elif args.dev:
+        selected = list(CATEGORIES)
+    else:
+        # Default mode: runtime essentials only (no heavy dataset, only active models)
+        selected = list(DEFAULT_CATEGORIES)
 
     url = f"https://drive.google.com/drive/folders/{args.folder_id}"
     print(f"Reading folder: {args.folder_id}")
@@ -111,6 +146,15 @@ def main() -> None:
             plan[c].append(f)
     for c in ("books", "dataset"):
         plan[c] = plan[c][:1]
+
+    # In default mode (non-dev, non-selective), filter weights to active/primary models only
+    if not args.dev and not user_selected:
+        for cat, preferred_names in PRIMARY_MODELS.items():
+            preferred_files = [
+                f for f in plan[cat] if Path(f.path).name.lower() in [n.lower() for n in preferred_names]
+            ]
+            if preferred_files:
+                plan[cat] = preferred_files
 
     if args.list:
         print(f"\nFiles in folder: {len(files)}")
@@ -133,7 +177,8 @@ def main() -> None:
     books_exists = books_target.exists() and any(books_target.iterdir())
     dataset_exists = dataset_target.exists() and any(dataset_target.iterdir())
 
-    print(f"Selected: {', '.join(selected)}")
+    mode_label = "all dev artifacts" if args.dev else ("selective" if user_selected else "runtime essentials")
+    print(f"Mode: {mode_label} | Categories: {', '.join(selected)}")
 
     to_download = {}
     for c in selected:
@@ -169,18 +214,17 @@ def main() -> None:
     if "detection" in selected:
         for f in plan["detection"]:
             if (p := local(f)):
-                copy_weight(p, detection_target)
+                copy_weight(p, detection_target, category="detection")
 
     if "retrieval" in selected:
         for f in plan["retrieval"]:
             if (p := local(f)):
-                copy_weight(p, retrieval_target)
+                copy_weight(p, retrieval_target, category="retrieval")
 
     if "index" in selected:
         for f in plan["index"]:
             if (p := local(f)):
-                shutil.copy2(p, index_target / p.name)
-                print(f"Added index: {p.name} -> {index_target.name}")
+                copy_weight(p, index_target, category="index")
 
     if "books" in selected and not books_exists:
         for f in plan["books"]:
@@ -194,6 +238,7 @@ def main() -> None:
 
     shutil.rmtree(temp_dir, ignore_errors=True)
     print("Synchronization finished")
+
 
 if __name__ == "__main__":
     main()
