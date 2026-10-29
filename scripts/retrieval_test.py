@@ -9,10 +9,48 @@ from tqdm import tqdm
 from src.detection.detector import StampDetector
 from src.paths import CERAMIC_DATA_DIR, CONFIGS_DIR, REPORTS_DIR
 from src.pipeline import CeramicPipeline
-from src.retrieval.books import project_path, resolve_reference
+from src.preprocessing.crop import crop_stamp
+from src.preprocessing.image import read_bgr
+from src.retrieval.books import load_book_records, project_path, resolve_reference
 from src.retrieval.encoder import StampEncoder
 from src.retrieval.index import StampIndex
 from src.utils import load_yaml
+import numpy as np
+
+
+def build_index_for_model(
+    encoder: StampEncoder,
+    books_dir: Path,
+    meta_csv: Path,
+    output_path: Path,
+    batch_size: int = 16,
+) -> StampIndex:
+    records = load_book_records(meta_csv, books_dir)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    vectors = []
+    batch = []
+    for record in tqdm(records, desc="  Building index", unit="mark"):
+        img = read_bgr(books_dir / record["image_path"])
+        h, w = img.shape[:2]
+        prepared = crop_stamp(
+            image=img,
+            box=(0.0, 0.0, float(w), float(h)),
+            padding_ratio=0.0,
+            target_size=encoder.input_size,
+        )
+        batch.append(prepared)
+        if len(batch) == batch_size:
+            vectors.append(encoder.embed_many(batch))
+            batch = []
+    if batch:
+        vectors.append(encoder.embed_many(batch))
+
+    embeddings = np.concatenate(vectors, axis=0)
+    index = StampIndex(embeddings, records)
+    index.save(output_path, books_dir)
+    print(f"  ✓ Auto-built index: {output_path} ({len(index)} marks)")
+    return index
 
 
 def parse_args():
@@ -166,7 +204,7 @@ def main():
     print(f"Total test queries: {len(records)}")
     print(f"Models to evaluate: {', '.join(model_names)}")
 
-    books_path, _ = resolve_reference(
+    books_path, books_meta_csv = resolve_reference(
         books_dir=raw_config.get("books", {}).get("dir"),
         meta_csv=raw_config.get("books", {}).get("meta_csv"),
     )
@@ -205,15 +243,17 @@ def main():
         if not weights_file.is_file():
             print(f"[Skip] Weights not found: {weights_file}")
             continue
-        if not index_file.is_file():
-            print(f"[Skip] Index not found: {index_file}")
-            continue
 
         print(f"  Weights: {weights_file}")
-        print(f"  Index:   {index_file}")
-
         encoder = StampEncoder.from_mapping(encoder_dict, weights=weights_file)
-        index = StampIndex.load(index_file, books_dir=books_path)
+
+        if not index_file.is_file():
+            print(f"  [Index missing] Index not found at: {index_file}")
+            print(f"  --> Automatically building index for '{name}'...")
+            index = build_index_for_model(encoder, books_path, books_meta_csv, index_file)
+        else:
+            print(f"  Index:   {index_file}")
+            index = StampIndex.load(index_file, books_dir=books_path)
 
         pipeline = CeramicPipeline(
             encoder=encoder,

@@ -3,18 +3,7 @@ top_k: 10
 active_model: "stamp_encoder"
 
 models:
-  stamp_encoder_v1:
-    encoder:
-      weights: "weights/retrieval_weights/stamp_encoder_v1.onnx"
-      input_size: 224
-      mean: [0.485, 0.456, 0.406]
-      std: [0.229, 0.224, 0.225]
-      num_threads: 4
-      enhance_contrast: true
-    index:
-      path: "data/books_index/stamp_books_index_v1.npz"
-  
-  stamp_encoder_v2:
+  stamp_encoder:
     encoder:
       weights: "weights/retrieval_weights/stamp_encoder.onnx"
       input_size: 224
@@ -24,6 +13,17 @@ models:
       enhance_contrast: true
     index:
       path: "data/books_index/stamp_books_index.npz"
+
+  stamp_encoder_v1:
+    encoder:
+      weights: "weights/retrieval_weights/stamp_encoder_v1.onnx"
+      input_size: 224
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
+      num_threads: 4
+      enhance_contrast: true
+    index:
+      path: "data/books_index/books_index_stamp_encoder_v1.npz"
 
   student_encoder:
     encoder:
@@ -45,7 +45,18 @@ models:
       num_threads: 4
       enhance_contrast: true
     index:
-      path: "data/books_index/student_encoder_katya.npz"
+      path: "data/books_index/books_index_student_encoder_katya.npz"
+
+  encoder_sasha:
+    encoder:
+      weights: "weights/retrieval_weights/encoder_sasha.onnx"
+      input_size: 224
+      mean: [0.0, 0.0, 0.0]
+      std: [1.0, 1.0, 1.0]
+      num_threads: 4
+      enhance_contrast: true
+    index:
+      path: "data/books_index/books_index_encoder_sasha.npz"
 
 books:
   dir: "data/books"
