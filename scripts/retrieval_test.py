@@ -121,7 +121,12 @@ def evaluate_single_model(pipeline, records, images_dir, top_k: int, no_detect: 
             print(f"[Warning] Image not found: {raw_query}")
             continue
 
-        pred = pipeline.predict(image_path, top_k=top_k, detect=not no_detect)
+        pred = pipeline.predict(
+            image_path,
+            top_k=top_k,
+            detect=not no_detect,
+            fallback_to_full_image=False,
+        )
         detections = pred.get("detections", [])
 
         best_rank = None

@@ -39,7 +39,9 @@ def render_preview(result: dict, target_size: int, output_path: Path) -> list[Pa
         box = detection.get("box")
         score = detection.get("score")
 
-        if box is not None and score is not None:
+        if detection.get("fallback"):
+            det_title = "Клеймо не найдено (фото целиком)"
+        elif box is not None and score is not None:
             x1, y1, x2, y2 = [int(v) for v in box]
             cv2.rectangle(photo_display, (x1, y1), (x2, y2), (255, 0, 0), 3)
             det_title = f"Детекция (conf: {score:.2f})"
@@ -62,7 +64,8 @@ def render_preview(result: dict, target_size: int, output_path: Path) -> list[Pa
             crop_bgr = crop_stamp(image_bgr, box, target_size=target_size)
 
         ax_crop.imshow(cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2RGB))
-        ax_crop.set_title(f"Кроп {target_size}x{target_size}", fontsize=11, weight="bold")
+        crop_title = "Вход энкодера (ресайз)" if detection.get("fallback") else f"Кроп {target_size}x{target_size}"
+        ax_crop.set_title(crop_title, fontsize=11, weight="bold")
         ax_crop.axis("off")
 
         for m_idx, match in enumerate(matches):

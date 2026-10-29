@@ -133,14 +133,30 @@ def main() -> None:
 
     for idx, image_path in enumerate(target_images, start=1):
         print(f"\n[{idx}/{len(target_images)}] Processing: {image_path.name}")
-        result = pipeline.predict(image_path, top_k=top_k, detect=not args.no_detect)
+        result = pipeline.predict(
+            image_path,
+            top_k=top_k,
+            detect=not args.no_detect,
+            fallback_to_full_image=True,
+        )
 
         detections = result.get("detections", [])
-        print(f"Found detections: {len(detections)}")
+        is_fallback = any(d.get("fallback") for d in detections)
+
+        if is_fallback:
+            print("  [Detection] Клеймо не обнаружено детектором. Поиск выполняется по исходному изображению целиком.")
+        else:
+            print(f"Found detections: {len(detections)}")
 
         for i, detection in enumerate(detections, start=1):
             score_val = detection["score"]
-            score_str = f"{score_val:.3f}" if score_val is not None else "no-detector"
+            if detection.get("fallback"):
+                score_str = "fallback (full photo)"
+            elif score_val is not None:
+                score_str = f"{score_val:.3f}"
+            else:
+                score_str = "no-detector"
+
             print(f"  Detection #{i} | Conf: {score_str} | Box: {detection['box']}")
             for match in detection.get("matches", []):
                 print(

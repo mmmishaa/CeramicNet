@@ -46,6 +46,7 @@ class CeramicPipeline:
         image_path: Path,
         top_k: int | None = None,
         detect: bool = True,
+        fallback_to_full_image: bool = True,
     ) -> dict:
         k = self._resolve_top_k(top_k)
         image = read_bgr(image_path)
@@ -83,7 +84,34 @@ class CeramicPipeline:
         boxes = boxes[order]
         scores = scores[order]
 
-        crops = self._preprocess(image, boxes) if len(boxes) else []
+        if len(boxes) == 0:
+            if fallback_to_full_image:
+                height, width = image.shape[:2]
+                full_crop = crop_stamp(
+                    image=image,
+                    box=(0.0, 0.0, float(width), float(height)),
+                    padding_ratio=0.0,
+                    target_size=self.target_size,
+                )
+                return {
+                    "image": str(image_path),
+                    "top_k": k,
+                    "detections": [
+                        {
+                            "box": [0.0, 0.0, float(width), float(height)],
+                            "score": None,
+                            "matches": self._retrieve(full_crop, top_k=k),
+                            "fallback": True,
+                        }
+                    ],
+                }
+            return {
+                "image": str(image_path),
+                "top_k": k,
+                "detections": [],
+            }
+
+        crops = self._preprocess(image, boxes)
         detections = []
         for box, score, crop in zip(boxes, scores, crops):
             detections.append(
