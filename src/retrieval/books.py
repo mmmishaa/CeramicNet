@@ -4,7 +4,6 @@ import yaml
 
 from src.paths import CONFIGS_DIR, ROOT_DIR
 
-
 def project_path(value: str | Path) -> Path:
     path = Path(value)
     if path.is_absolute():
@@ -12,7 +11,7 @@ def project_path(value: str | Path) -> Path:
     return ROOT_DIR / path
 
 
-def load_retrieval_config(path: str | Path | None = None) -> dict:
+def load_retrieval_config(path: str | Path | None = None, model_name: str | None = None) -> dict:
     config_path = (
         project_path(path)
         if path
@@ -25,6 +24,14 @@ def load_retrieval_config(path: str | Path | None = None) -> dict:
         config = yaml.safe_load(handle)
     if not isinstance(config, dict):
         raise ValueError(f"Конфиг пустой: {config_path}")
+
+    if "models" in config:
+        active = model_name or config.get("active_model")
+        if active not in config["models"]:
+            raise KeyError(f"Модель '{active}' не найдена. Доступны: {list(config['models'].keys())}")
+        config["encoder"] = config["models"][active]["encoder"]
+        config["index"] = config["models"][active]["index"]
+
     return config
 
 

@@ -7,7 +7,7 @@ import yaml
 
 from src.paths import CONFIGS_DIR, DATA_DIR, REPORTS_DIR
 from src.pipeline import CeramicPipeline
-from src.retrieval.books import project_path, resolve_reference
+from src.retrieval.books import load_retrieval_config, project_path, resolve_reference
 from src.retrieval.encoder import StampEncoder
 from src.retrieval.index import StampIndex
 from src.detection.detector import StampDetector
@@ -69,6 +69,7 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=CONFIGS_DIR / "detection" / "detection_config.yaml",
     )
+    parser.add_argument("--model", type=str, default=None, help="Encoder model to use from config")
     parser.add_argument("--top-k", type=int, default=None)
     parser.add_argument("--no-detect", action="store_true", help="Run without detector")
     parser.add_argument("--show", action="store_true", help="Display result preview")
@@ -91,7 +92,7 @@ def main() -> None:
         target_images = resolve_image_paths(resolved_path)
         print(f"Total images to process: {len(target_images)}")
 
-    ret_cfg = load_yaml(args.retrieval_config)
+    ret_cfg = load_retrieval_config(args.retrieval_config, model_name=args.model)
     det_cfg = load_yaml(args.detection_config)
 
     books_path, _ = resolve_reference(
