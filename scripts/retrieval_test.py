@@ -314,24 +314,49 @@ def main():
             all_detailed_results.append(r_copy)
 
     if summary_rows:
-        print_summary_table(summary_rows)
-
-        # Save summary CSV
         args.summary_csv.parent.mkdir(parents=True, exist_ok=True)
         summary_headers = ["Model", "Total", "Detected", "No_Det", "Hit@1", "Hit@3", "Hit@5", "Hit@10", "MRR"]
+        existing_summary = {}
+        if args.summary_csv.is_file():
+            try:
+                with open(args.summary_csv, "r", encoding="utf-8") as f:
+                    for row in csv.DictReader(f):
+                        if "Model" in row:
+                            existing_summary[row["Model"]] = row
+            except Exception:
+                existing_summary = {}
+
+        for row in summary_rows:
+            existing_summary[row["Model"]] = row
+
+        all_summary_rows = list(existing_summary.values())
+        print_summary_table(all_summary_rows)
+
         with open(args.summary_csv, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=summary_headers)
             writer.writeheader()
-            writer.writerows(summary_rows)
+            writer.writerows(all_summary_rows)
         print(f"\nSummary saved: {args.summary_csv}")
 
     if all_detailed_results:
         args.output_csv.parent.mkdir(parents=True, exist_ok=True)
         fieldnames = ["model"] + [k for k in all_detailed_results[0].keys() if k != "model"]
+        new_models = {r["model"] for r in all_detailed_results}
+        existing_detailed = []
+        if args.output_csv.is_file():
+            try:
+                with open(args.output_csv, "r", encoding="utf-8") as f:
+                    for row in csv.DictReader(f):
+                        if row.get("model") not in new_models:
+                            existing_detailed.append(row)
+            except Exception:
+                existing_detailed = []
+
+        combined_detailed = existing_detailed + all_detailed_results
         with open(args.output_csv, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
-            writer.writerows(all_detailed_results)
+            writer.writerows(combined_detailed)
         print(f"Detailed results saved: {args.output_csv}")
 
 
